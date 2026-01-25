@@ -143,14 +143,14 @@ io.on('connection', (socket) => {
   });
 
   // Play a card
-  socket.on('playCard', ({ cardIndex, action, target }) => {
+  socket.on('playCard', ({ cardIndex, action, target, bankAsAction }) => {
     const playerInfo = playerSockets.get(socket.id);
     if (!playerInfo) return;
 
     const game = games.get(playerInfo.gameCode);
     if (!game) return;
 
-    const result = game.playCard(playerInfo.playerId, cardIndex, action, target);
+    const result = game.playCard(playerInfo.playerId, cardIndex, action, target, bankAsAction);
     if (result.error) {
       socket.emit('error', { message: result.error });
       return;

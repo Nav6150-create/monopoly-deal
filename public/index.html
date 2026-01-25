@@ -242,15 +242,16 @@
     <div class="modal-content modal-large">
       <h2>Pay <span id="payment-amount">$0</span>M</h2>
       <p id="payment-info">Select cards to pay with</p>
+      <p id="payment-warning" class="hidden" style="text-align: center; color: #e74c3c; font-size: 14px; margin-bottom: 10px;"></p>
       <div class="payment-sections">
         <div class="payment-bank">
-          <h4>Your Bank</h4>
+          <h4>Your Bank <button id="select-all-bank" class="btn btn-small" style="float: right; padding: 4px 10px; font-size: 11px;">Select All</button></h4>
           <div id="payment-bank-cards" class="payment-cards">
             <!-- Bank cards for payment -->
           </div>
         </div>
         <div class="payment-properties">
-          <h4>Your Properties</h4>
+          <h4>Your Properties <button id="select-all-props" class="btn btn-small" style="float: right; padding: 4px 10px; font-size: 11px;">Select All</button></h4>
           <div id="payment-property-cards" class="payment-cards">
             <!-- Property cards for payment -->
           </div>
@@ -275,6 +276,19 @@
       </div>
       <div class="modal-actions">
         <button id="color-cancel" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Card Choice Modal -->
+  <div id="action-choice-modal" class="modal">
+    <div class="modal-content">
+      <h2 id="action-choice-title">Play Action Card</h2>
+      <p id="action-choice-desc" style="text-align: center; color: #a0a0b0; margin-bottom: 20px;">What would you like to do with this card?</p>
+      <div class="modal-actions" style="flex-direction: column; gap: 12px;">
+        <button id="action-use-btn" class="btn btn-primary">Use Action</button>
+        <button id="action-bank-btn" class="btn btn-secondary">Add to Bank ($<span id="action-bank-value">0</span>M)</button>
+        <button id="action-cancel-btn" class="btn btn-secondary">Cancel</button>
       </div>
     </div>
   </div>

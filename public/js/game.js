@@ -22,7 +22,8 @@ const modals = {
   target: document.getElementById('target-modal'),
   payment: document.getElementById('payment-modal'),
   color: document.getElementById('color-modal'),
-  gameover: document.getElementById('gameover-modal')
+  gameover: document.getElementById('gameover-modal'),
+  actionChoice: document.getElementById('action-choice-modal')
 };
 
 // Initialize
@@ -712,13 +713,38 @@ function handleCardClick(card, index) {
       break;
 
     case 'action':
-      handleActionCard(card, index);
+      showActionChoiceModal(card, index, () => handleActionCard(card, index));
       break;
 
     case 'rent':
-      handleRentCard(card, index);
+      showActionChoiceModal(card, index, () => handleRentCard(card, index));
       break;
   }
+}
+
+// Action card choice modal - Use or Bank
+function showActionChoiceModal(card, index, useCallback) {
+  document.getElementById('action-choice-title').textContent = card.name;
+  document.getElementById('action-bank-value').textContent = card.value;
+
+  // Set up button handlers
+  document.getElementById('action-use-btn').onclick = () => {
+    hideModal('actionChoice');
+    useCallback();
+  };
+
+  document.getElementById('action-bank-btn').onclick = () => {
+    hideModal('actionChoice');
+    socket.emit('playCard', { cardIndex: index, bankAsAction: true });
+    selectedCard = null;
+  };
+
+  document.getElementById('action-cancel-btn').onclick = () => {
+    hideModal('actionChoice');
+    selectedCard = null;
+  };
+
+  showModal('actionChoice');
 }
 
 function handleActionCard(card, index) {
@@ -1176,6 +1202,13 @@ function showPaymentModal(action) {
 
   document.getElementById('payment-amount').textContent = `$${action.amount}`;
 
+  // Calculate total assets
+  let totalAssets = 0;
+  myPlayer.bank.forEach(card => totalAssets += card.value);
+  Object.values(myPlayer.properties).forEach(cards => {
+    cards.forEach(card => totalAssets += card.value);
+  });
+
   let info = '';
   if (action.type === 'rent') {
     info = `Pay rent for ${gameState.propertyColors[action.color]?.name || action.color}`;
@@ -1183,6 +1216,15 @@ function showPaymentModal(action) {
     info = "It's someone's birthday! Pay $2M";
   } else if (action.type === 'debtCollector') {
     info = 'Debt collector demands $5M';
+  }
+
+  // Add partial payment info if player can't afford full amount
+  if (totalAssets < action.amount) {
+    if (totalAssets === 0) {
+      info += ' (You have nothing to pay)';
+    } else {
+      info += ` (You only have $${totalAssets}M - must give everything)`;
+    }
   }
   document.getElementById('payment-info').textContent = info;
 
@@ -1232,9 +1274,57 @@ function showPaymentModal(action) {
   });
 
   paymentSelection = { bank: [], properties: {} };
+
+  // Show warning if player can't afford full amount
+  const warningEl = document.getElementById('payment-warning');
+  if (totalAssets < action.amount && totalAssets > 0) {
+    warningEl.textContent = 'You cannot afford the full amount. You must select all your cards.';
+    warningEl.classList.remove('hidden');
+  } else if (totalAssets === 0) {
+    warningEl.textContent = 'You have no assets to pay with.';
+    warningEl.classList.remove('hidden');
+  } else {
+    warningEl.classList.add('hidden');
+  }
+
+  // Set up Select All buttons
+  document.getElementById('select-all-bank').onclick = () => selectAllBank(myPlayer);
+  document.getElementById('select-all-props').onclick = () => selectAllProperties(myPlayer);
+
   updatePaymentTotal();
 
   showModal('payment');
+}
+
+function selectAllBank(myPlayer) {
+  const bankContainer = document.getElementById('payment-bank-cards');
+  const cards = bankContainer.querySelectorAll('.game-card');
+
+  paymentSelection.bank = [];
+  cards.forEach((card, index) => {
+    card.classList.add('selected');
+    paymentSelection.bank.push(index);
+  });
+
+  updatePaymentTotal();
+}
+
+function selectAllProperties(myPlayer) {
+  const propContainer = document.getElementById('payment-property-cards');
+  const cards = propContainer.querySelectorAll('.game-card');
+
+  paymentSelection.properties = {};
+  cards.forEach(card => {
+    card.classList.add('selected');
+    const color = card.dataset.color;
+    const index = parseInt(card.dataset.index);
+    if (!paymentSelection.properties[color]) {
+      paymentSelection.properties[color] = [];
+    }
+    paymentSelection.properties[color].push(index);
+  });
+
+  updatePaymentTotal();
 }
 
 function togglePaymentCard(element, type, index, value, color = null) {

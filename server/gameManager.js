@@ -282,7 +282,7 @@ class GameManager {
     return { success: true };
   }
 
-  playCard(playerId, cardIndex, action, target) {
+  playCard(playerId, cardIndex, action, target, bankAsAction = false) {
     const player = this.players.find(p => p.id === playerId);
     if (!player) return { error: 'Player not found' };
 
@@ -303,6 +303,14 @@ class GameManager {
     }
 
     const card = player.hand[cardIndex];
+
+    // If player chose to bank an action/rent card instead of using it
+    if (bankAsAction && (card.type === CARD_TYPES.ACTION || card.type === CARD_TYPES.RENT)) {
+      player.hand.splice(cardIndex, 1);
+      player.bank.push(card);
+      this.actionsThisTurn++;
+      return { success: true };
+    }
 
     // Handle different card types
     switch (card.type) {
@@ -680,13 +688,33 @@ class GameManager {
       // Pay with selected cards (money and/or properties)
       const totalValue = this.calculatePaymentValue(player, cards);
       const requiredAmount = this.pendingAction.amount;
+      const totalAssets = this.getTotalAssets(player);
 
-      // Validate payment
-      if (totalValue < requiredAmount && this.getTotalAssets(player) >= requiredAmount) {
-        return { error: 'Insufficient payment' };
+      // If player has nothing, they don't need to pay anything
+      if (totalAssets === 0) {
+        this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== playerId);
+        this.pendingAction.responses[playerId] = 'paid';
+        if (this.pendingAction.respondingPlayers.length === 0) {
+          this.resolvePendingAction();
+        }
+        return { success: true };
       }
 
-      // Process payment
+      // If player can't afford full amount, they must give everything they have
+      // Accept any payment if player's total assets are less than required
+      if (totalAssets < requiredAmount) {
+        // Player must pay everything - check if they selected all their assets
+        if (totalValue < totalAssets) {
+          return { error: `You must give all your assets ($${totalAssets}M) since you cannot pay the full amount` };
+        }
+      } else {
+        // Player can afford full amount - validate they paid enough
+        if (totalValue < requiredAmount) {
+          return { error: 'Insufficient payment' };
+        }
+      }
+
+      // Process payment - no change is given (overpayment goes to receiver)
       const paidCards = this.processPayment(player, cards);
       const fromPlayer = this.players.find(p => p.id === this.pendingAction.fromPlayer);
 

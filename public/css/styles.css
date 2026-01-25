@@ -872,6 +872,31 @@ body {
   gap: 4px;
 }
 
+.set-cards.stacked {
+  position: relative;
+  min-width: 55px;
+}
+
+.stacked-card {
+  position: absolute;
+  left: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stacked-card:hover {
+  transform: translateX(5px) scale(1.05);
+  z-index: 10;
+}
+
+.property-set {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.property-set:hover {
+  transform: scale(1.02);
+}
+
 .bank-cards {
   display: flex;
   flex-wrap: wrap;
@@ -1189,6 +1214,83 @@ body {
 .target-option strong {
   font-size: 18px;
   font-weight: 800;
+}
+
+/* Rent Chart Modal */
+.rent-chart {
+  margin: 20px 0;
+}
+
+.rent-chart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rent-chart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rent-property-count {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.rent-amount {
+  color: var(--success);
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.rent-bonus-info {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rent-bonus-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  color: var(--text-secondary);
+}
+
+.rent-bonus-item span:last-child {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.rent-current-info {
+  margin-top: 20px;
+}
+
+.current-rent-display {
+  padding: 16px;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+}
+
+.current-rent-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.current-rent-amount {
+  font-size: 24px;
+  font-weight: 800;
+  margin-top: 8px;
 }
 
 /* Color Selection - Enhanced */

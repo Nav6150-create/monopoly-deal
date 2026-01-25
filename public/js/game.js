@@ -23,7 +23,8 @@ const modals = {
   payment: document.getElementById('payment-modal'),
   color: document.getElementById('color-modal'),
   gameover: document.getElementById('gameover-modal'),
-  actionChoice: document.getElementById('action-choice-modal')
+  actionChoice: document.getElementById('action-choice-modal'),
+  rent: document.getElementById('rent-modal')
 };
 
 // Initialize
@@ -76,6 +77,9 @@ function setupEventListeners() {
     hideModal('gameover');
     showScreen('home');
   });
+
+  // Rent chart modal
+  document.getElementById('close-rent').addEventListener('click', () => hideModal('rent'));
 
   // Socket events
   socket.on('gameCreated', handleGameCreated);
@@ -327,9 +331,16 @@ function renderGame() {
     handlePendingAction();
   }
 
-  // Handle must discard
+  // Handle must discard - show persistent message
+  const actionPrompt = document.getElementById('action-prompt');
   if (gameState.mustDiscard > 0 && isMyTurn) {
-    showToast(`Must discard ${gameState.mustDiscard} card(s)`, 'error');
+    actionPrompt.innerHTML = `
+      <h3>Discard Cards</h3>
+      <p>You must discard ${gameState.mustDiscard} card(s) to end your turn. Click cards in your hand to discard.</p>
+    `;
+    actionPrompt.classList.remove('hidden');
+  } else if (!gameState.pendingAction) {
+    actionPrompt.classList.add('hidden');
   }
 }
 
@@ -357,7 +368,7 @@ function renderOpponents() {
       <div class="opponent-props">
         ${renderOpponentProperties(player.properties)}
       </div>
-      <div class="opponent-bank">$${player.bankTotal}M</div>
+      <div class="opponent-bank">${player.bankTotal}M</div>
     `;
     container.appendChild(div);
   });
@@ -396,18 +407,51 @@ function renderProperties(properties, containerId) {
 
     const setDiv = document.createElement('div');
     setDiv.className = `property-set ${isComplete ? 'complete' : ''}`;
+    setDiv.dataset.color = color;
+
+    // Create stacked card display
+    const cardsHtml = cards.map((card, index) => {
+      const offset = index * 18; // Stack cards with offset
+      return renderStackedMiniCard(card, colorInfo.color, `prop-${color}-${index}`, offset);
+    }).join('');
+
     setDiv.innerHTML = `
       <div class="set-header">${colorInfo.name} (${propertyCards.length}/${colorInfo.setSize})</div>
-      <div class="set-cards">
-        ${cards.map((card, index) => renderMiniCard(card, colorInfo.color, `prop-${color}-${index}`)).join('')}
+      <div class="set-cards stacked" style="height: ${60 + (cards.length - 1) * 18}px;">
+        ${cardsHtml}
       </div>
     `;
+
+    // Add click handler to show rent chart
+    setDiv.addEventListener('click', () => showRentChart(color, colorInfo, cards));
+
     container.appendChild(setDiv);
   });
 
   if (Object.keys(properties).length === 0) {
     container.innerHTML = '<div style="color: #888; font-size: 12px;">No properties yet</div>';
   }
+}
+
+function renderStackedMiniCard(card, color, id, offset) {
+  let bgColor = color || '#3498db';
+  let content = '';
+
+  if (card.type === 'money') {
+    bgColor = '#27ae60';
+    content = `$${card.value}`;
+  } else if (card.action === 'house') {
+    bgColor = '#27ae60';
+    content = 'H';
+  } else if (card.action === 'hotel') {
+    bgColor = '#e74c3c';
+    content = 'HT';
+  }
+
+  return `<div class="game-card mini stacked-card" style="border-top-color: ${bgColor}; color: ${bgColor}; top: ${offset}px;" data-id="${id}">
+    <div class="card-header"><span class="card-value">$${card.value}</span></div>
+    <div class="card-body" style="font-size: 10px; font-weight: bold;">${content}</div>
+  </div>`;
 }
 
 function renderMiniCard(card, color, id) {
@@ -798,8 +842,7 @@ function handleActionCard(card, index) {
       break;
 
     case 'doubleRent':
-      showToast('Play this with a Rent card', 'error');
-      selectedCard = null;
+      showDoubleRentSelection(index);
       break;
 
     default:
@@ -830,6 +873,134 @@ function handleRentCard(card, index) {
       });
     } else {
       socket.emit('playCard', { cardIndex: index, action: color });
+      selectedCard = null;
+    }
+  });
+}
+
+// Double Rent card selection - show available rent cards to play with
+function showDoubleRentSelection(doubleRentIndex) {
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+
+  // Find all rent cards in hand
+  const rentCards = myPlayer.hand
+    .map((card, index) => ({ card, index }))
+    .filter(({ card, index }) => card.type === 'rent' && index !== doubleRentIndex);
+
+  if (rentCards.length === 0) {
+    showToast('You need a Rent card to play with Double the Rent', 'error');
+    selectedCard = null;
+    return;
+  }
+
+  // Check if we have enough actions (double rent + rent = 2 actions)
+  if (gameState.actionsRemaining < 2) {
+    showToast('You need at least 2 actions to play Double the Rent', 'error');
+    selectedCard = null;
+    return;
+  }
+
+  document.getElementById('target-title').textContent = 'Select a Rent Card to Double';
+  const container = document.getElementById('target-options');
+  container.innerHTML = '';
+
+  const colorInfo = gameState.propertyColors;
+
+  rentCards.forEach(({ card, index }) => {
+    // Check if player has properties for this rent card
+    let hasValidProperties = false;
+    let colorNames = '';
+
+    if (card.colors === 'ALL') {
+      hasValidProperties = Object.keys(myPlayer.properties).some(c =>
+        myPlayer.properties[c] && myPlayer.properties[c].length > 0
+      );
+      colorNames = 'Wild (Any Color)';
+    } else {
+      hasValidProperties = card.colors.some(c =>
+        myPlayer.properties[c] && myPlayer.properties[c].length > 0
+      );
+      colorNames = card.colors.map(c => colorInfo[c]?.name || c).join('/');
+    }
+
+    if (!hasValidProperties) return;
+
+    const div = document.createElement('div');
+    div.className = 'target-option';
+
+    // Create color display
+    let bgStyle = '';
+    if (card.colors === 'ALL') {
+      bgStyle = 'background: linear-gradient(45deg, #e74c3c, #f39c12, #27ae60, #3498db);';
+    } else {
+      const colors = card.colors.map(c => colorInfo[c]?.color || '#333');
+      bgStyle = `background: linear-gradient(135deg, ${colors[0]} 50%, ${colors[1]} 50%);`;
+    }
+
+    div.innerHTML = `
+      <div style="width: 30px; height: 40px; ${bgStyle} border-radius: 4px;"></div>
+      <div>
+        <strong>${card.name}</strong>
+        <div style="font-size: 12px; color: #888;">${colorNames}</div>
+      </div>
+    `;
+    div.addEventListener('click', () => {
+      container.querySelectorAll('.target-option').forEach(o => o.classList.remove('selected'));
+      div.classList.add('selected');
+      selectedTarget = { rentCardIndex: index, rentCard: card };
+      document.getElementById('target-confirm').disabled = false;
+    });
+    container.appendChild(div);
+  });
+
+  if (container.children.length === 0) {
+    container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">No valid rent cards (you need properties matching the rent card colors)</div>';
+  }
+
+  selectedTarget = null;
+  document.getElementById('target-confirm').disabled = true;
+  document.getElementById('target-confirm').onclick = () => {
+    hideModal('target');
+    if (selectedTarget) {
+      // Now handle the rent card selection like normal, but with doubleRent flag
+      handleDoubleRentWithCard(doubleRentIndex, selectedTarget.rentCardIndex, selectedTarget.rentCard);
+    }
+  };
+
+  showModal('target');
+}
+
+function handleDoubleRentWithCard(doubleRentIndex, rentCardIndex, rentCard) {
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+
+  // Determine available colors
+  const availableColors = rentCard.colors === 'ALL' ?
+    Object.keys(myPlayer.properties).filter(c => myPlayer.properties[c] && myPlayer.properties[c].length > 0) :
+    rentCard.colors.filter(c => myPlayer.properties[c] && myPlayer.properties[c].length > 0);
+
+  if (availableColors.length === 0) {
+    showToast('You need properties of this color to charge rent', 'error');
+    selectedCard = null;
+    return;
+  }
+
+  showColorSelection(availableColors, (color) => {
+    if (rentCard.colors === 'ALL') {
+      // Wild rent - need to select target player
+      showPlayerSelection('Select a player to charge rent', (playerId) => {
+        socket.emit('playCard', {
+          cardIndex: rentCardIndex,
+          action: color,
+          target: { playerId, doubleRent: true, doubleRentIndex }
+        });
+        selectedCard = null;
+      });
+    } else {
+      socket.emit('playCard', {
+        cardIndex: rentCardIndex,
+        action: color,
+        target: { doubleRent: true, doubleRentIndex }
+      });
       selectedCard = null;
     }
   });
@@ -1409,6 +1580,77 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Rent chart display
+function showRentChart(color, colorInfo, playerCards) {
+  document.getElementById('rent-title').textContent = `${colorInfo.name} Rent Chart`;
+
+  const chartContainer = document.getElementById('rent-chart');
+  const currentInfoContainer = document.getElementById('rent-current-info');
+
+  // Build rent chart
+  let chartHtml = '<div class="rent-chart-items">';
+  colorInfo.rent.forEach((amount, index) => {
+    const propertyCount = index + 1;
+    chartHtml += `
+      <div class="rent-chart-item">
+        <span class="rent-property-count">${propertyCount} ${propertyCount === 1 ? 'Property' : 'Properties'}</span>
+        <span class="rent-amount">$${amount}M</span>
+      </div>
+    `;
+  });
+  chartHtml += '</div>';
+
+  // Add house/hotel info for non-railroad/utility
+  if (color !== 'RAILROAD' && color !== 'UTILITY') {
+    chartHtml += `
+      <div class="rent-bonus-info">
+        <div class="rent-bonus-item">
+          <span>+ House</span>
+          <span>+$3M</span>
+        </div>
+        <div class="rent-bonus-item">
+          <span>+ Hotel</span>
+          <span>+$4M</span>
+        </div>
+      </div>
+    `;
+  }
+
+  chartContainer.innerHTML = chartHtml;
+
+  // Calculate current rent for this player's set
+  if (playerCards && playerCards.length > 0) {
+    const propertyCards = playerCards.filter(c =>
+      c.type === 'property' || c.type === 'property_wild' || c.type === 'property_wild_all'
+    );
+    const propertyCount = propertyCards.length;
+    let currentRent = colorInfo.rent[Math.min(propertyCount - 1, colorInfo.rent.length - 1)] || 0;
+
+    const hasHouse = playerCards.some(c => c.action === 'house');
+    const hasHotel = playerCards.some(c => c.action === 'hotel');
+    if (hasHouse) currentRent += 3;
+    if (hasHotel) currentRent += 4;
+
+    const isComplete = propertyCount >= colorInfo.setSize;
+
+    currentInfoContainer.innerHTML = `
+      <div class="current-rent-display" style="background-color: ${colorInfo.color};">
+        <div>Your ${colorInfo.name} Set:</div>
+        <div class="current-rent-stats">
+          <span>${propertyCount}/${colorInfo.setSize} properties${isComplete ? ' (Complete!)' : ''}</span>
+          ${hasHouse ? '<span>+ House</span>' : ''}
+          ${hasHotel ? '<span>+ Hotel</span>' : ''}
+        </div>
+        <div class="current-rent-amount">Current Rent: $${currentRent}M</div>
+      </div>
+    `;
+  } else {
+    currentInfoContainer.innerHTML = '';
+  }
+
+  showModal('rent');
 }
 
 // Initialize

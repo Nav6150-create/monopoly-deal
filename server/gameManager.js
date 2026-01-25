@@ -605,13 +605,22 @@ class GameManager {
     if (hasHouse) rentAmount += 3;
     if (hasHotel) rentAmount += 4;
 
-    // Check for double rent
+    // Check for double rent - use the provided index if available
     if (target && target.doubleRent && this.actionsThisTurn < this.maxActionsPerTurn - 1) {
-      const doubleRentIndex = player.hand.findIndex(c => c.action === 'doubleRent');
-      if (doubleRentIndex !== -1) {
-        player.hand.splice(doubleRentIndex, 1);
+      let doubleRentIndex = target.doubleRentIndex;
+      // If no specific index provided, find a double rent card
+      if (doubleRentIndex === undefined) {
+        doubleRentIndex = player.hand.findIndex(c => c.action === 'doubleRent');
+      }
+      if (doubleRentIndex !== -1 && player.hand[doubleRentIndex] && player.hand[doubleRentIndex].action === 'doubleRent') {
+        const doubleRentCard = player.hand.splice(doubleRentIndex, 1)[0];
+        this.discardPile.push(doubleRentCard);
         rentAmount *= 2;
         this.actionsThisTurn++;
+        // Adjust cardIndex if the doubleRent card was before it
+        if (doubleRentIndex < cardIndex) {
+          cardIndex--;
+        }
       }
     }
 

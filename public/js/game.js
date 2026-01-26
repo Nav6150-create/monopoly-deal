@@ -310,9 +310,23 @@ function renderGame() {
   const drawBtn = document.getElementById('draw-btn');
   const endTurnBtn = document.getElementById('end-turn-btn');
 
-  drawBtn.disabled = !isMyTurn || gameState.hasDrawnThisTurn;
+  // Hide draw button since drawing is now automatic
+  drawBtn.style.display = 'none';
+
+  // End turn button - only needed when player still has actions and wants to pass
   endTurnBtn.disabled = !isMyTurn || !gameState.hasDrawnThisTurn ||
     gameState.mustDiscard > 0 || gameState.pendingAction;
+
+  // Update end turn button text based on remaining actions
+  if (isMyTurn && gameState.hasDrawnThisTurn) {
+    if (gameState.actionsRemaining > 0) {
+      endTurnBtn.textContent = `End Turn (${gameState.actionsRemaining} actions left)`;
+    } else {
+      endTurnBtn.textContent = 'End Turn';
+    }
+  } else {
+    endTurnBtn.textContent = 'End Turn';
+  }
 
   // Render opponents
   renderOpponents();
@@ -1362,8 +1376,149 @@ function handlePendingAction() {
 
   // Check if I need to respond
   if (action.respondingPlayers.includes(myPlayerId)) {
-    showPaymentModal(action);
+    // Different handling for different action types
+    if (action.type === 'slyDeal' || action.type === 'dealBreaker') {
+      showStealConfirmModal(action);
+    } else if (action.type === 'forcedDeal') {
+      showForcedDealConfirmModal(action);
+    } else {
+      // rent, birthday, debtCollector - show payment modal
+      showPaymentModal(action);
+    }
   }
+}
+
+// Show confirmation modal for Sly Deal / Deal Breaker (opponent can Say No or Accept)
+function showStealConfirmModal(action) {
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+  const fromPlayer = gameState.players.find(p => p.id === action.fromPlayer);
+  const colorInfo = gameState.propertyColors;
+
+  document.getElementById('target-title').textContent = action.type === 'slyDeal' ? 'Sly Deal!' : 'Deal Breaker!';
+  const container = document.getElementById('target-options');
+  container.innerHTML = '';
+
+  if (action.type === 'slyDeal') {
+    const stolenCard = myPlayer.properties[action.color]?.[action.cardIndex];
+    const color = colorInfo[action.color];
+    container.innerHTML = `
+      <div style="text-align: center; padding: 20px;">
+        <p style="color: #e74c3c; font-size: 18px; font-weight: bold; margin-bottom: 16px;">
+          ${escapeHtml(fromPlayer.name)} wants to steal your property!
+        </p>
+        <div style="display: flex; justify-content: center; margin: 20px 0;">
+          <div style="width: 60px; height: 80px; background: ${color?.color || '#333'}; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; text-align: center; padding: 4px;">
+            ${stolenCard?.name || 'Property'}
+          </div>
+        </div>
+        <p style="color: #888;">This property will go to ${escapeHtml(fromPlayer.name)}</p>
+      </div>
+    `;
+  } else {
+    // Deal Breaker - entire set
+    const color = colorInfo[action.color];
+    const setCards = myPlayer.properties[action.color] || [];
+    container.innerHTML = `
+      <div style="text-align: center; padding: 20px;">
+        <p style="color: #e74c3c; font-size: 18px; font-weight: bold; margin-bottom: 16px;">
+          ${escapeHtml(fromPlayer.name)} wants to steal your complete ${color?.name || action.color} set!
+        </p>
+        <div style="display: flex; justify-content: center; gap: 8px; margin: 20px 0; flex-wrap: wrap;">
+          ${setCards.map(card => `
+            <div style="width: 50px; height: 70px; background: ${color?.color || '#333'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px; text-align: center; padding: 4px;">
+              ${card.name || 'Card'}
+            </div>
+          `).join('')}
+        </div>
+        <p style="color: #888;">This entire set will go to ${escapeHtml(fromPlayer.name)}</p>
+      </div>
+    `;
+  }
+
+  // Check for Say No card
+  const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
+
+  // Update buttons
+  document.getElementById('target-confirm').textContent = 'Accept';
+  document.getElementById('target-confirm').disabled = false;
+  document.getElementById('target-cancel').textContent = hasSayNo ? 'Just Say No!' : 'Cancel';
+  document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
+
+  document.getElementById('target-confirm').onclick = () => {
+    hideModal('target');
+    socket.emit('respondToAction', { response: 'accept' });
+  };
+
+  document.getElementById('target-cancel').onclick = () => {
+    if (hasSayNo) {
+      hideModal('target');
+      socket.emit('respondToAction', { response: 'sayNo' });
+    }
+  };
+
+  showModal('target');
+}
+
+// Show confirmation modal for Forced Deal (opponent can Say No or Accept the swap)
+function showForcedDealConfirmModal(action) {
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+  const fromPlayer = gameState.players.find(p => p.id === action.fromPlayer);
+  const colorInfo = gameState.propertyColors;
+
+  document.getElementById('target-title').textContent = 'Forced Deal!';
+  const container = document.getElementById('target-options');
+  container.innerHTML = '';
+
+  const theirCard = myPlayer.properties[action.theirColor]?.[action.theirCardIndex];
+  const yourCard = fromPlayer.properties[action.yourColor]?.[action.yourCardIndex];
+  const theirColor = colorInfo[action.theirColor];
+  const yourColor = colorInfo[action.yourColor];
+
+  container.innerHTML = `
+    <div style="text-align: center; padding: 20px;">
+      <p style="color: #f39c12; font-size: 18px; font-weight: bold; margin-bottom: 16px;">
+        ${escapeHtml(fromPlayer.name)} wants to trade properties!
+      </p>
+      <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin: 20px 0;">
+        <div style="text-align: center;">
+          <p style="color: #e74c3c; font-size: 12px; margin-bottom: 8px;">You Give</p>
+          <div style="width: 60px; height: 80px; background: ${theirColor?.color || '#333'}; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; text-align: center; padding: 4px;">
+            ${theirCard?.name || 'Property'}
+          </div>
+        </div>
+        <div style="font-size: 24px; color: #888;">⇄</div>
+        <div style="text-align: center;">
+          <p style="color: #27ae60; font-size: 12px; margin-bottom: 8px;">You Get</p>
+          <div style="width: 60px; height: 80px; background: ${yourColor?.color || '#333'}; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; text-align: center; padding: 4px;">
+            ${yourCard?.name || 'Property'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Check for Say No card
+  const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
+
+  // Update buttons
+  document.getElementById('target-confirm').textContent = 'Accept Trade';
+  document.getElementById('target-confirm').disabled = false;
+  document.getElementById('target-cancel').textContent = hasSayNo ? 'Just Say No!' : 'Cancel';
+  document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
+
+  document.getElementById('target-confirm').onclick = () => {
+    hideModal('target');
+    socket.emit('respondToAction', { response: 'accept' });
+  };
+
+  document.getElementById('target-cancel').onclick = () => {
+    if (hasSayNo) {
+      hideModal('target');
+      socket.emit('respondToAction', { response: 'sayNo' });
+    }
+  };
+
+  showModal('target');
 }
 
 let paymentSelection = { bank: [], properties: {} };

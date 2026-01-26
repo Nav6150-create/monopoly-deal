@@ -156,6 +156,9 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Try to auto-end turn if no actions left
+    game.tryAutoEndTurn();
+
     broadcastGameState(game);
 
     // Check for winner
@@ -198,6 +201,9 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Try to auto-end turn after discarding
+    game.tryAutoEndTurn();
+
     broadcastGameState(game);
   });
 
@@ -214,6 +220,9 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: result.error });
       return;
     }
+
+    // Try to auto-end turn after action resolves
+    game.tryAutoEndTurn();
 
     broadcastGameState(game);
   });

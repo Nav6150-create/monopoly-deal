@@ -246,6 +246,30 @@ class GameManager {
         }
       }
     });
+
+    // Auto-draw 2 cards for the first player
+    this.autoDrawForCurrentPlayer();
+  }
+
+  autoDrawForCurrentPlayer() {
+    const player = this.getCurrentPlayer();
+    if (!player || this.hasDrawnThisTurn) return;
+
+    // Draw 2 cards (or remaining deck)
+    const cardsToDraw = Math.min(2, this.deck.length);
+    for (let i = 0; i < cardsToDraw; i++) {
+      if (this.deck.length > 0) {
+        player.hand.push(this.deck.pop());
+      }
+    }
+
+    // If deck is empty, shuffle discard pile
+    if (this.deck.length === 0 && this.discardPile.length > 0) {
+      this.deck = shuffle(this.discardPile);
+      this.discardPile = [];
+    }
+
+    this.hasDrawnThisTurn = true;
   }
 
   getCurrentPlayer() {
@@ -693,6 +717,11 @@ class GameManager {
       this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== playerId);
       this.pendingAction.responses[playerId] = 'sayNo';
 
+    } else if (response === 'accept') {
+      // Accept the action (for slyDeal, forcedDeal, dealBreaker)
+      this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== playerId);
+      this.pendingAction.responses[playerId] = 'accepted';
+
     } else if (response === 'pay') {
       // Pay with selected cards (money and/or properties)
       const totalValue = this.calculatePaymentValue(player, cards);
@@ -727,9 +756,20 @@ class GameManager {
       const paidCards = this.processPayment(player, cards);
       const fromPlayer = this.players.find(p => p.id === this.pendingAction.fromPlayer);
 
-      // Add paid cards to requesting player's bank
+      // Add paid cards to requesting player
+      // Money goes to bank, properties go to property section
       paidCards.forEach(card => {
-        fromPlayer.bank.push(card);
+        if (card.type === CARD_TYPES.PROPERTY || card.type === CARD_TYPES.PROPERTY_WILD || card.type === CARD_TYPES.PROPERTY_WILD_ALL) {
+          // Property cards go to the receiver's property section
+          const propertyColor = card.currentColor || card.color;
+          if (!fromPlayer.properties[propertyColor]) {
+            fromPlayer.properties[propertyColor] = [];
+          }
+          fromPlayer.properties[propertyColor].push(card);
+        } else {
+          // Money and action cards go to bank
+          fromPlayer.bank.push(card);
+        }
       });
 
       this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== playerId);
@@ -936,7 +976,39 @@ class GameManager {
     this.actionsThisTurn = 0;
     this.hasDrawnThisTurn = false;
 
+    // Auto-draw for the next player
+    this.autoDrawForCurrentPlayer();
+
     return { success: true };
+  }
+
+  // Check if turn should auto-end (no actions left and no discards needed)
+  shouldAutoEndTurn() {
+    const player = this.getCurrentPlayer();
+    if (!player) return false;
+
+    return this.hasDrawnThisTurn &&
+           this.actionsThisTurn >= this.maxActionsPerTurn &&
+           player.hand.length <= 7 &&
+           !this.pendingAction;
+  }
+
+  // Auto-end turn and return true if it happened
+  tryAutoEndTurn() {
+    if (!this.shouldAutoEndTurn()) return false;
+
+    const player = this.getCurrentPlayer();
+    const playerId = player.id;
+
+    // Move to next player
+    this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+    this.actionsThisTurn = 0;
+    this.hasDrawnThisTurn = false;
+
+    // Auto-draw for the next player
+    this.autoDrawForCurrentPlayer();
+
+    return true;
   }
 
   checkWinCondition(player) {

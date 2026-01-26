@@ -733,6 +733,39 @@ body {
   border-radius: 5px;
   border: 2px solid rgba(0,0,0,0.3);
   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  font-size: 8px;
+  font-weight: 800;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.prop-mini.stacked {
+  position: absolute;
+  top: 0;
+}
+
+.prop-set-mini {
+  height: 32px;
+  position: relative;
+}
+
+.prop-set-mini.complete {
+  border: 2px solid var(--success);
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+  padding: 2px;
+}
+
+.building-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 14px;
+  z-index: 10;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
 }
 
 .opponent-bank {
@@ -1366,6 +1399,56 @@ body {
   border: 2px solid rgba(46, 204, 113, 0.3);
 }
 
+/* Payment set group for complete sets */
+.payment-set-group {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(46, 204, 113, 0.4);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 8px;
+}
+
+.payment-set-group:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.payment-set-group.selected {
+  border-color: var(--primary);
+  background: linear-gradient(145deg, rgba(231, 76, 60, 0.2), rgba(231, 76, 60, 0.1));
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+}
+
+.payment-set-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.payment-set-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.payment-set-cards .game-card {
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.payment-set-group.selected .payment-set-cards .game-card {
+  opacity: 1;
+}
+
 /* Winner Display - Enhanced */
 .winner-display {
   text-align: center;
@@ -1848,6 +1931,90 @@ body {
     margin: 10px;
     padding: 12px;
   }
+}
+
+/* Just Say No Notification */
+.say-no-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  animation: fadeIn 0.3s ease;
+}
+
+.say-no-popup {
+  background: linear-gradient(160deg, #2d2d48 0%, #1a1a2e 100%);
+  border-radius: 24px;
+  padding: 40px 50px;
+  text-align: center;
+  box-shadow: 0 25px 80px rgba(231, 76, 60, 0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  border: 3px solid var(--primary);
+  animation: sayNoAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.say-no-icon {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 20px;
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 30px rgba(231, 76, 60, 0.5);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.say-no-icon svg {
+  width: 60px;
+  height: 60px;
+}
+
+.say-no-popup h2 {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--primary);
+  margin-bottom: 10px;
+  text-shadow: 0 2px 10px rgba(231, 76, 60, 0.4);
+}
+
+.say-no-popup p {
+  font-size: 18px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+@keyframes sayNoAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-10deg);
+  }
+  50% {
+    transform: scale(1.1) rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* House/Hotel indicators on player property sets */
+.property-set .building-indicator {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  justify-content: center;
+}
+
+.building-indicator .building-icon {
+  font-size: 16px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 /* Utility classes */

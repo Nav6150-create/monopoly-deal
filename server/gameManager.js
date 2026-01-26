@@ -700,6 +700,12 @@ class GameManager {
       const sayNoCard = player.hand.splice(sayNoIndex, 1)[0];
       this.discardPile.push(sayNoCard);
 
+      // Track who just used Say No for client notification
+      this.pendingAction.sayNoUsedBy = {
+        playerId: playerId,
+        playerName: player.name
+      };
+
       // Check if the action player can counter
       const fromPlayer = this.players.find(p => p.id === this.pendingAction.fromPlayer);
       const counterSayNo = fromPlayer.hand.findIndex(c => c.action === 'sayNo');
@@ -710,7 +716,7 @@ class GameManager {
           playerId: this.pendingAction.fromPlayer,
           againstPlayer: playerId
         };
-        return { success: true, counterOpportunity: true };
+        return { success: true, counterOpportunity: true, sayNoUsedBy: this.pendingAction.sayNoUsedBy };
       }
 
       // Remove this player from responding players
@@ -736,6 +742,12 @@ class GameManager {
           this.resolvePendingAction();
         }
         return { success: true };
+      }
+
+      // Validate that complete sets are not being broken up
+      const setValidation = this.validatePaymentSets(player, cards);
+      if (!setValidation.valid) {
+        return { error: setValidation.error };
       }
 
       // If player can't afford full amount, they must give everything they have
@@ -808,6 +820,39 @@ class GameManager {
     }
 
     return total;
+  }
+
+  // Validate that complete sets are not being broken up
+  validatePaymentSets(player, cards) {
+    if (!cards.properties) return { valid: true };
+
+    for (const [color, indices] of Object.entries(cards.properties)) {
+      const playerSet = player.properties[color];
+      if (!playerSet) continue;
+
+      // Count property cards in this set (exclude house/hotel)
+      const propertyCards = playerSet.filter(c =>
+        c.type === CARD_TYPES.PROPERTY ||
+        c.type === CARD_TYPES.PROPERTY_WILD ||
+        c.type === CARD_TYPES.PROPERTY_WILD_ALL
+      );
+
+      const setInfo = PROPERTY_COLORS[color];
+      const isCompleteSet = propertyCards.length >= setInfo.setSize;
+
+      if (isCompleteSet) {
+        // If paying from a complete set, must pay all cards in the set
+        const totalCardsInSet = playerSet.length;
+        if (indices.length > 0 && indices.length < totalCardsInSet) {
+          return {
+            valid: false,
+            error: `Cannot break up the complete ${setInfo.name} set. You must pay the entire set or none of it.`
+          };
+        }
+      }
+    }
+
+    return { valid: true };
   }
 
   getTotalAssets(player) {

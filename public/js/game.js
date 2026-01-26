@@ -342,7 +342,20 @@ function renderGame() {
 
   // Handle pending actions
   if (gameState.pendingAction) {
+    // Check if someone just used Say No (and it wasn't us)
+    if (gameState.pendingAction.sayNoUsedBy &&
+        gameState.pendingAction.sayNoUsedBy.playerId !== myPlayerId) {
+      const sayNoKey = `${gameState.pendingAction.sayNoUsedBy.playerId}-${Date.now()}`;
+      // Only show if we haven't shown this one yet
+      if (lastSayNoUsedBy !== gameState.pendingAction.sayNoUsedBy.playerId + gameState.pendingAction.type) {
+        lastSayNoUsedBy = gameState.pendingAction.sayNoUsedBy.playerId + gameState.pendingAction.type;
+        showSayNoNotification(gameState.pendingAction.sayNoUsedBy.playerName);
+      }
+    }
     handlePendingAction();
+  } else {
+    // Reset Say No tracking when action resolves
+    lastSayNoUsedBy = null;
   }
 
   // Handle must discard - show persistent message
@@ -395,9 +408,42 @@ function renderOpponentProperties(properties) {
   Object.entries(properties).forEach(([color, cards]) => {
     const colorInfo = colors[color];
     if (colorInfo && cards.length > 0) {
-      cards.forEach(() => {
-        html += `<div class="prop-mini" style="background-color: ${colorInfo.color}"></div>`;
+      // Check if set is complete
+      const propertyCards = cards.filter(c =>
+        c.type === 'property' || c.type === 'property_wild' || c.type === 'property_wild_all'
+      );
+      const isComplete = propertyCards.length >= colorInfo.setSize;
+
+      // Check for house/hotel
+      const hasHouse = cards.some(c => c.action === 'house');
+      const hasHotel = cards.some(c => c.action === 'hotel');
+
+      // Create stacked set display
+      const stackWidth = 24 + (cards.length - 1) * 6;
+      html += `<div class="prop-set-mini ${isComplete ? 'complete' : ''}" style="width: ${stackWidth}px; position: relative; display: inline-block; margin-right: 8px; margin-bottom: 4px;">`;
+
+      cards.forEach((card, idx) => {
+        let bgColor = colorInfo.color;
+        let icon = '';
+
+        if (card.action === 'house') {
+          bgColor = '#27ae60';
+          icon = 'H';
+        } else if (card.action === 'hotel') {
+          bgColor = '#e74c3c';
+          icon = 'HT';
+        }
+
+        html += `<div class="prop-mini stacked" style="background-color: ${bgColor}; left: ${idx * 6}px; z-index: ${idx};">${icon}</div>`;
       });
+
+      // Add house/hotel indicator badge on top
+      if (hasHouse || hasHotel) {
+        const badge = hasHotel ? '🏨' : '🏠';
+        html += `<span class="building-badge">${badge}</span>`;
+      }
+
+      html += '</div>';
     }
   });
 
@@ -1575,7 +1621,7 @@ function showPaymentModal(action) {
     bankContainer.appendChild(div);
   });
 
-  // Render property cards
+  // Render property cards - group complete sets together
   const propContainer = document.getElementById('payment-property-cards');
   propContainer.innerHTML = '';
   const colorInfo = gameState.propertyColors;
@@ -1584,22 +1630,60 @@ function showPaymentModal(action) {
     const info = colorInfo[color];
     if (!info) return;
 
-    cards.forEach((card, cardIndex) => {
-      const div = document.createElement('div');
-      div.className = 'game-card mini';
-      div.style.borderTopColor = info.color;
-      div.innerHTML = `
-        <div class="card-header"><span class="card-value">$${card.value}</span></div>
-        <div class="card-body" style="background: ${info.color}; color: white; margin: 3px; border-radius: 3px; font-size: 8px;">${info.name}</div>
+    // Check if this is a complete set
+    const propertyCards = cards.filter(c =>
+      c.type === 'property' || c.type === 'property_wild' || c.type === 'property_wild_all'
+    );
+    const isCompleteSet = propertyCards.length >= info.setSize;
+
+    if (isCompleteSet) {
+      // Render complete set as a single selectable group
+      const setDiv = document.createElement('div');
+      setDiv.className = 'payment-set-group';
+      setDiv.dataset.color = color;
+      setDiv.dataset.isSet = 'true';
+
+      const setTotal = cards.reduce((sum, c) => sum + c.value, 0);
+      setDiv.innerHTML = `
+        <div class="payment-set-label" style="background: ${info.color};">
+          <span>${info.name} Set</span>
+          <span>$${setTotal}M</span>
+        </div>
+        <div class="payment-set-cards">
+          ${cards.map((card, idx) => `
+            <div class="game-card mini" style="border-top-color: ${card.action === 'house' ? '#27ae60' : card.action === 'hotel' ? '#e74c3c' : info.color};">
+              <div class="card-header"><span class="card-value">$${card.value}</span></div>
+              <div class="card-body" style="background: ${card.action === 'house' ? '#27ae60' : card.action === 'hotel' ? '#e74c3c' : info.color}; color: white; margin: 3px; border-radius: 3px; font-size: 8px;">
+                ${card.action === 'house' ? 'H' : card.action === 'hotel' ? 'HT' : info.name}
+              </div>
+            </div>
+          `).join('')}
+        </div>
       `;
-      div.dataset.color = color;
-      div.dataset.index = cardIndex;
-      div.addEventListener('click', () => togglePaymentCard(div, 'property', cardIndex, card.value, color));
-      propContainer.appendChild(div);
-    });
+
+      setDiv.addEventListener('click', () => togglePaymentSet(setDiv, color, cards));
+      propContainer.appendChild(setDiv);
+    } else {
+      // Render individual cards for incomplete sets
+      cards.forEach((card, cardIndex) => {
+        const div = document.createElement('div');
+        div.className = 'game-card mini';
+        div.style.borderTopColor = card.action === 'house' ? '#27ae60' : card.action === 'hotel' ? '#e74c3c' : info.color;
+        div.innerHTML = `
+          <div class="card-header"><span class="card-value">$${card.value}</span></div>
+          <div class="card-body" style="background: ${card.action === 'house' ? '#27ae60' : card.action === 'hotel' ? '#e74c3c' : info.color}; color: white; margin: 3px; border-radius: 3px; font-size: 8px;">
+            ${card.action === 'house' ? 'H' : card.action === 'hotel' ? 'HT' : info.name}
+          </div>
+        `;
+        div.dataset.color = color;
+        div.dataset.index = cardIndex;
+        div.addEventListener('click', () => togglePaymentCard(div, 'property', cardIndex, card.value, color));
+        propContainer.appendChild(div);
+      });
+    }
   });
 
-  paymentSelection = { bank: [], properties: {} };
+  paymentSelection = { bank: [], properties: {}, completeSets: [] };
 
   // Show warning if player can't afford full amount
   const warningEl = document.getElementById('payment-warning');
@@ -1638,16 +1722,33 @@ function selectAllBank(myPlayer) {
 function selectAllProperties(myPlayer) {
   const propContainer = document.getElementById('payment-property-cards');
   const cards = propContainer.querySelectorAll('.game-card');
+  const setGroups = propContainer.querySelectorAll('.payment-set-group');
 
   paymentSelection.properties = {};
+  paymentSelection.completeSets = [];
+
+  // Select individual cards
   cards.forEach(card => {
     card.classList.add('selected');
     const color = card.dataset.color;
-    const index = parseInt(card.dataset.index);
-    if (!paymentSelection.properties[color]) {
-      paymentSelection.properties[color] = [];
+    const index = card.dataset.index;
+    if (color && index !== undefined) {
+      if (!paymentSelection.properties[color]) {
+        paymentSelection.properties[color] = [];
+      }
+      paymentSelection.properties[color].push(parseInt(index));
     }
-    paymentSelection.properties[color].push(index);
+  });
+
+  // Select complete sets
+  setGroups.forEach(setGroup => {
+    setGroup.classList.add('selected');
+    const color = setGroup.dataset.color;
+    const setCards = myPlayer.properties[color];
+    if (setCards) {
+      paymentSelection.completeSets.push({ color, cardCount: setCards.length });
+      paymentSelection.properties[color] = setCards.map((_, idx) => idx);
+    }
   });
 
   updatePaymentTotal();
@@ -1671,6 +1772,30 @@ function togglePaymentCard(element, type, index, value, color = null) {
     } else {
       paymentSelection.properties[color].push(index);
     }
+  }
+
+  updatePaymentTotal();
+}
+
+function togglePaymentSet(element, color, cards) {
+  element.classList.toggle('selected');
+
+  // Initialize completeSets array if needed
+  if (!paymentSelection.completeSets) {
+    paymentSelection.completeSets = [];
+  }
+
+  const setIndex = paymentSelection.completeSets.findIndex(s => s.color === color);
+
+  if (setIndex !== -1) {
+    // Deselect - remove from completeSets
+    paymentSelection.completeSets.splice(setIndex, 1);
+    // Also remove from properties
+    delete paymentSelection.properties[color];
+  } else {
+    // Select - add all card indices to both completeSets tracking and properties
+    paymentSelection.completeSets.push({ color, cardCount: cards.length });
+    paymentSelection.properties[color] = cards.map((_, idx) => idx);
   }
 
   updatePaymentTotal();
@@ -1729,6 +1854,40 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.remove();
   }, 3000);
+}
+
+// Just Say No notification popup
+let lastSayNoUsedBy = null;
+
+function showSayNoNotification(playerName) {
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'say-no-overlay';
+  overlay.innerHTML = `
+    <div class="say-no-popup">
+      <div class="say-no-icon">
+        <svg viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="20" fill="white"/>
+          <path d="M14 14L34 34M34 14L14 34" stroke="#e74c3c" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2>Just Say No!</h2>
+      <p>${escapeHtml(playerName)} blocked the action!</p>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Auto-remove after 2.5 seconds
+  setTimeout(() => {
+    overlay.style.animation = 'fadeIn 0.3s ease reverse';
+    setTimeout(() => overlay.remove(), 300);
+  }, 2500);
+
+  // Allow clicking to dismiss early
+  overlay.addEventListener('click', () => {
+    overlay.remove();
+  });
 }
 
 function escapeHtml(text) {

@@ -682,12 +682,105 @@ class GameManager {
       return { error: 'No pending action' };
     }
 
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return { error: 'Player not found' };
+
+    // Handle counter Say No (action player responding to someone's Say No)
+    if (response === 'counterSayNo') {
+      // Verify this player has a counter opportunity
+      if (!this.pendingAction.sayNoChain ||
+          this.pendingAction.sayNoChain.awaitingCounter !== playerId) {
+        return { error: 'You cannot counter Say No right now' };
+      }
+
+      // Check if player has a Say No card
+      const sayNoIndex = player.hand.findIndex(c => c.action === 'sayNo');
+      if (sayNoIndex === -1) {
+        return { error: 'You do not have a "Just Say No!" card' };
+      }
+
+      // Play the counter Say No card
+      const sayNoCard = player.hand.splice(sayNoIndex, 1)[0];
+      this.discardPile.push(sayNoCard);
+
+      // Track for notification
+      this.pendingAction.sayNoUsedBy = {
+        playerId: playerId,
+        playerName: player.name
+      };
+
+      // Increment the Say No chain count
+      this.pendingAction.sayNoChain.count++;
+
+      // Now the other player can counter if they have a Say No
+      const otherPlayerId = this.pendingAction.sayNoChain.againstPlayer;
+      const otherPlayer = this.players.find(p => p.id === otherPlayerId);
+      const otherHasSayNo = otherPlayer.hand.some(c => c.action === 'sayNo');
+
+      if (otherHasSayNo) {
+        // Other player can counter
+        this.pendingAction.sayNoChain.awaitingCounter = otherPlayerId;
+        this.pendingAction.sayNoChain.againstPlayer = playerId;
+        return { success: true, sayNoUsedBy: this.pendingAction.sayNoUsedBy };
+      } else {
+        // Chain ends - odd count means original Say No was countered (action succeeds)
+        // even count means action is blocked
+        const actionSucceeds = this.pendingAction.sayNoChain.count % 2 === 1;
+
+        if (actionSucceeds) {
+          // Remove the target from responding (action will proceed)
+          const targetId = this.pendingAction.sayNoChain.originalSayNoPlayer;
+          this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== targetId);
+          this.pendingAction.responses[targetId] = 'countered';
+        } else {
+          // Action is blocked
+          const targetId = this.pendingAction.sayNoChain.originalSayNoPlayer;
+          this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== targetId);
+          this.pendingAction.responses[targetId] = 'sayNo';
+        }
+
+        // Clear the chain
+        delete this.pendingAction.sayNoChain;
+
+        // Check if action is resolved
+        if (this.pendingAction.respondingPlayers.length === 0) {
+          this.resolvePendingAction();
+        }
+
+        return { success: true, sayNoUsedBy: this.pendingAction.sayNoUsedBy };
+      }
+    }
+
+    // Handle declining to counter
+    if (response === 'declineCounter') {
+      if (!this.pendingAction.sayNoChain ||
+          this.pendingAction.sayNoChain.awaitingCounter !== playerId) {
+        return { error: 'No counter to decline' };
+      }
+
+      // Chain ends - count determines outcome
+      // odd count = action blocked, even count = action succeeds
+      const actionBlocked = this.pendingAction.sayNoChain.count % 2 === 1;
+      const targetId = this.pendingAction.sayNoChain.originalSayNoPlayer;
+
+      this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== targetId);
+      this.pendingAction.responses[targetId] = actionBlocked ? 'sayNo' : 'countered';
+
+      // Clear the chain
+      delete this.pendingAction.sayNoChain;
+
+      // Check if action is resolved
+      if (this.pendingAction.respondingPlayers.length === 0) {
+        this.resolvePendingAction();
+      }
+
+      return { success: true };
+    }
+
+    // For regular responses, check if player needs to respond
     if (!this.pendingAction.respondingPlayers.includes(playerId)) {
       return { error: 'You are not required to respond' };
     }
-
-    const player = this.players.find(p => p.id === playerId);
-    if (!player) return { error: 'Player not found' };
 
     if (response === 'sayNo') {
       // Check if player has a "Just Say No" card
@@ -706,20 +799,22 @@ class GameManager {
         playerName: player.name
       };
 
-      // Check if the action player can counter
+      // Check if the action player can counter with their own Say No
       const fromPlayer = this.players.find(p => p.id === this.pendingAction.fromPlayer);
-      const counterSayNo = fromPlayer.hand.findIndex(c => c.action === 'sayNo');
+      const fromPlayerHasSayNo = fromPlayer.hand.some(c => c.action === 'sayNo');
 
-      if (counterSayNo !== -1) {
-        // Set up counter opportunity
-        this.pendingAction.counterOpportunity = {
-          playerId: this.pendingAction.fromPlayer,
-          againstPlayer: playerId
+      if (fromPlayerHasSayNo) {
+        // Start a Say No chain - action player can counter
+        this.pendingAction.sayNoChain = {
+          count: 1, // First Say No played
+          awaitingCounter: this.pendingAction.fromPlayer,
+          againstPlayer: playerId,
+          originalSayNoPlayer: playerId
         };
-        return { success: true, counterOpportunity: true, sayNoUsedBy: this.pendingAction.sayNoUsedBy };
+        return { success: true, sayNoUsedBy: this.pendingAction.sayNoUsedBy };
       }
 
-      // Remove this player from responding players
+      // No counter possible - Say No succeeds, action is blocked
       this.pendingAction.respondingPlayers = this.pendingAction.respondingPlayers.filter(id => id !== playerId);
       this.pendingAction.responses[playerId] = 'sayNo';
 

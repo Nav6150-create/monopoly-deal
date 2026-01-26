@@ -1420,6 +1420,12 @@ function showForcedDealStep2() {
 function handlePendingAction() {
   const action = gameState.pendingAction;
 
+  // Check if there's a Say No chain and I need to counter
+  if (action.sayNoChain && action.sayNoChain.awaitingCounter === myPlayerId) {
+    showCounterSayNoModal(action);
+    return;
+  }
+
   // Check if I need to respond
   if (action.respondingPlayers.includes(myPlayerId)) {
     // Different handling for different action types
@@ -1432,6 +1438,77 @@ function handlePendingAction() {
       showPaymentModal(action);
     }
   }
+}
+
+// Show modal to counter a Say No with another Say No
+function showCounterSayNoModal(action) {
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+  const againstPlayer = gameState.players.find(p => p.id === action.sayNoChain.againstPlayer);
+
+  document.getElementById('target-title').textContent = 'Counter with Say No?';
+  const container = document.getElementById('target-options');
+
+  // Determine what the original action was
+  let actionDesc = '';
+  if (action.type === 'dealBreaker') {
+    actionDesc = 'steal a complete property set';
+  } else if (action.type === 'slyDeal') {
+    actionDesc = 'steal a property';
+  } else if (action.type === 'forcedDeal') {
+    actionDesc = 'force a property trade';
+  } else if (action.type === 'rent') {
+    actionDesc = 'charge rent';
+  } else if (action.type === 'birthday') {
+    actionDesc = 'collect birthday money';
+  } else if (action.type === 'debtCollector') {
+    actionDesc = 'collect debt';
+  }
+
+  const sayNoCount = action.sayNoChain.count;
+  const willSucceedIfCounter = sayNoCount % 2 === 1; // If odd Say Nos played, countering makes action succeed
+
+  container.innerHTML = `
+    <div style="text-align: center; padding: 20px;">
+      <div class="say-no-icon" style="width: 80px; height: 80px; margin: 0 auto 20px;">
+        <svg viewBox="0 0 48 48" style="width: 50px; height: 50px;">
+          <circle cx="24" cy="24" r="20" fill="white"/>
+          <path d="M14 14L34 34M34 14L14 34" stroke="#e74c3c" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p style="color: #e74c3c; font-size: 18px; font-weight: bold; margin-bottom: 16px;">
+        ${escapeHtml(againstPlayer.name)} played Just Say No!
+      </p>
+      <p style="color: #888; margin-bottom: 16px;">
+        ${sayNoCount === 1 ? 'Your action to ' + actionDesc + ' was blocked.' : 'The Say No chain continues!'}
+      </p>
+      <p style="color: #f39c12; font-weight: bold;">
+        ${willSucceedIfCounter ? 'Counter to make your action succeed!' : 'Counter to block their action!'}
+      </p>
+    </div>
+  `;
+
+  // Check if I have a Say No card
+  const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
+
+  // Update buttons
+  document.getElementById('target-confirm').textContent = 'Let it go';
+  document.getElementById('target-confirm').disabled = false;
+  document.getElementById('target-cancel').textContent = hasSayNo ? 'Just Say No!' : '';
+  document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
+
+  document.getElementById('target-confirm').onclick = () => {
+    hideModal('target');
+    socket.emit('respondToAction', { response: 'declineCounter' });
+  };
+
+  document.getElementById('target-cancel').onclick = () => {
+    if (hasSayNo) {
+      hideModal('target');
+      socket.emit('respondToAction', { response: 'counterSayNo' });
+    }
+  };
+
+  showModal('target');
 }
 
 // Show confirmation modal for Sly Deal / Deal Breaker (opponent can Say No or Accept)

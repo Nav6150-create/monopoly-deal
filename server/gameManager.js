@@ -566,7 +566,13 @@ class GameManager {
           return { error: 'You do not have properties of that color' };
         }
         const buildSetInfo = PROPERTY_COLORS[target.color];
-        if (player.properties[target.color].length < buildSetInfo.setSize) {
+        // Count only property cards (not houses/hotels already on the set)
+        const propertyCardCount = player.properties[target.color].filter(c =>
+          c.type === CARD_TYPES.PROPERTY ||
+          c.type === CARD_TYPES.PROPERTY_WILD ||
+          c.type === CARD_TYPES.PROPERTY_WILD_ALL
+        ).length;
+        if (propertyCardCount < buildSetInfo.setSize) {
           return { error: 'Must have a complete set to add buildings' };
         }
         if (card.action === 'hotel') {

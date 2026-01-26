@@ -1215,11 +1215,21 @@ function showPlayerSelection(title, callback) {
     container.appendChild(div);
   });
 
+  // Set proper button text
+  document.getElementById('target-cancel').textContent = 'Cancel';
+  document.getElementById('target-cancel').style.display = 'block';
+  document.getElementById('target-confirm').textContent = 'Charge Rent';
+
   selectedTarget = null;
   document.getElementById('target-confirm').disabled = true;
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
     callback(selectedTarget);
+  };
+  document.getElementById('target-cancel').onclick = () => {
+    hideModal('target');
+    selectedCard = null;
+    selectedTarget = null;
   };
 
   showModal('target');
@@ -1246,26 +1256,51 @@ function showPropertySelection(title, completeOnly, callback) {
       if (completeOnly && !isComplete) return;
       if (!completeOnly && isComplete) return;
 
-      cards.forEach((card, cardIndex) => {
-        if (card.type !== 'property' && card.type !== 'property_wild' && card.type !== 'property_wild_all') return;
-
+      if (completeOnly) {
+        // For Deal Breaker: Show complete sets as a single option
         const div = document.createElement('div');
         div.className = 'target-option';
         div.innerHTML = `
-          <div style="width: 30px; height: 40px; background: ${info.color}; border-radius: 4px;"></div>
+          <div style="display: flex; gap: 4px;">
+            ${propertyCards.slice(0, 4).map(() =>
+              `<div style="width: 24px; height: 32px; background: ${info.color}; border-radius: 4px; border: 2px solid rgba(255,255,255,0.3);"></div>`
+            ).join('')}
+          </div>
           <div>
             <strong>${escapeHtml(player.name)}</strong>
-            <div style="font-size: 12px; color: ${info.color};">${card.name}</div>
+            <div style="font-size: 12px; color: ${info.color};">${info.name} Set (${propertyCards.length} cards)</div>
           </div>
         `;
         div.addEventListener('click', () => {
           container.querySelectorAll('.target-option').forEach(o => o.classList.remove('selected'));
           div.classList.add('selected');
-          selectedTarget = { playerId: player.id, color, cardIndex };
+          selectedTarget = { playerId: player.id, color };
           document.getElementById('target-confirm').disabled = false;
         });
         container.appendChild(div);
-      });
+      } else {
+        // For Sly Deal: Show individual cards
+        cards.forEach((card, cardIndex) => {
+          if (card.type !== 'property' && card.type !== 'property_wild' && card.type !== 'property_wild_all') return;
+
+          const div = document.createElement('div');
+          div.className = 'target-option';
+          div.innerHTML = `
+            <div style="width: 30px; height: 40px; background: ${info.color}; border-radius: 4px;"></div>
+            <div>
+              <strong>${escapeHtml(player.name)}</strong>
+              <div style="font-size: 12px; color: ${info.color};">${card.name}</div>
+            </div>
+          `;
+          div.addEventListener('click', () => {
+            container.querySelectorAll('.target-option').forEach(o => o.classList.remove('selected'));
+            div.classList.add('selected');
+            selectedTarget = { playerId: player.id, color, cardIndex };
+            document.getElementById('target-confirm').disabled = false;
+          });
+          container.appendChild(div);
+        });
+      }
     });
   });
 

@@ -77,6 +77,7 @@ function setupEventListeners() {
     hideModal('gameover');
     showScreen('home');
   });
+  document.getElementById('play-again-btn').addEventListener('click', requestPlayAgain);
 
   // Rent chart modal
   document.getElementById('close-rent').addEventListener('click', () => hideModal('rent'));
@@ -90,6 +91,9 @@ function setupEventListeners() {
   socket.on('gameState', handleGameState);
   socket.on('gameOver', handleGameOver);
   socket.on('error', handleError);
+  socket.on('playAgainRequested', handlePlayAgainRequested);
+  socket.on('playAgainUpdate', handlePlayAgainUpdate);
+  socket.on('gameRestarted', handleGameRestarted);
 }
 
 // Check URL for game code
@@ -277,7 +281,52 @@ function handleGameState(state) {
 
 function handleGameOver(data) {
   document.getElementById('winner-name').textContent = `${data.winnerName} Wins!`;
+  // Reset play again UI
+  document.getElementById('play-again-btn').disabled = false;
+  document.getElementById('play-again-btn').textContent = 'Play Again';
+  document.getElementById('play-again-status').classList.add('hidden');
   showModal('gameover');
+}
+
+function requestPlayAgain() {
+  socket.emit('requestPlayAgain');
+  document.getElementById('play-again-btn').disabled = true;
+  document.getElementById('play-again-btn').textContent = 'Waiting...';
+}
+
+function handlePlayAgainRequested(data) {
+  // Show the play again status section
+  const statusDiv = document.getElementById('play-again-status');
+  statusDiv.classList.remove('hidden');
+  updatePlayAgainStatus(data.votes);
+}
+
+function handlePlayAgainUpdate(data) {
+  updatePlayAgainStatus(data.votes);
+}
+
+function updatePlayAgainStatus(votes) {
+  const statusDiv = document.getElementById('play-again-status');
+  let html = '<h4>Play Again?</h4><div class="play-again-votes">';
+
+  votes.forEach(vote => {
+    const statusClass = vote.accepted === true ? 'accepted' :
+                        vote.accepted === false ? 'declined' : 'pending';
+    const statusIcon = vote.accepted === true ? '✓' :
+                       vote.accepted === false ? '✗' : '...';
+    html += `<div class="play-again-vote ${statusClass}">
+      <span>${escapeHtml(vote.name)}</span>
+      <span>${statusIcon}</span>
+    </div>`;
+  });
+
+  html += '</div>';
+  statusDiv.innerHTML = html;
+}
+
+function handleGameRestarted() {
+  hideModal('gameover');
+  showToast('New game starting!', 'success');
 }
 
 function handleError(data) {

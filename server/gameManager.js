@@ -1201,6 +1201,59 @@ class GameManager {
       propertyColors: PROPERTY_COLORS
     };
   }
+
+  // Play Again functionality
+  initPlayAgain(playerId) {
+    if (!this.playAgainVotes) {
+      this.playAgainVotes = {};
+    }
+    this.playAgainVotes[playerId] = true;
+    return this.getPlayAgainStatus();
+  }
+
+  getPlayAgainStatus() {
+    const votes = this.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      accepted: this.playAgainVotes ? this.playAgainVotes[p.id] : undefined
+    }));
+    return { votes };
+  }
+
+  checkAllPlayersAccepted() {
+    if (!this.playAgainVotes) return false;
+    return this.players.every(p => this.playAgainVotes[p.id] === true);
+  }
+
+  restartGame() {
+    // Reset game state but keep players
+    this.state = 'playing';
+    this.currentPlayerIndex = 0;
+    this.deck = createDeck();
+    this.shuffleDeck();
+    this.discardPile = [];
+    this.actionsThisTurn = 0;
+    this.hasDrawnThisTurn = false;
+    this.pendingAction = null;
+    this.winner = null;
+    this.playAgainVotes = null;
+
+    // Reset player hands, properties, and banks
+    this.players.forEach(p => {
+      p.hand = [];
+      p.properties = {};
+      p.bank = [];
+    });
+
+    // Deal initial hands
+    this.players.forEach(player => {
+      for (let i = 0; i < 5; i++) {
+        if (this.deck.length > 0) {
+          player.hand.push(this.deck.pop());
+        }
+      }
+    });
+  }
 }
 
 module.exports = GameManager;

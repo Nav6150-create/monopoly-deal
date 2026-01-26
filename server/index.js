@@ -227,6 +227,38 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
+  // Request play again
+  socket.on('requestPlayAgain', () => {
+    const playerInfo = playerSockets.get(socket.id);
+    if (!playerInfo) return;
+
+    const game = games.get(playerInfo.gameCode);
+    if (!game || game.state !== 'finished') return;
+
+    const status = game.initPlayAgain(playerInfo.playerId);
+
+    // Notify all players about the play again request
+    io.to(playerInfo.gameCode).emit('playAgainRequested', status);
+
+    // Check if all players accepted
+    if (game.checkAllPlayersAccepted()) {
+      game.restartGame();
+
+      // Notify all players that game is restarting
+      io.to(playerInfo.gameCode).emit('gameRestarted');
+
+      // Send initial game state to each player
+      game.players.forEach(p => {
+        const playerSocket = io.sockets.sockets.get(p.socketId);
+        if (playerSocket) {
+          playerSocket.emit('gameStarted', game.getStateForPlayer(p.id));
+        }
+      });
+
+      console.log(`Game ${playerInfo.gameCode} restarted`);
+    }
+  });
+
   // Handle disconnect
   socket.on('disconnect', () => {
     const playerInfo = playerSockets.get(socket.id);

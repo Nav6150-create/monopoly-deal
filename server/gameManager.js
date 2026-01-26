@@ -288,8 +288,9 @@ class GameManager {
       return { error: 'Already drew cards this turn' };
     }
 
-    // Draw 2 cards (or remaining deck)
-    const cardsToDraw = Math.min(2, this.deck.length);
+    // Draw 5 cards if hand is empty, otherwise draw 2
+    const baseCardsToDraw = player.hand.length === 0 ? 5 : 2;
+    const cardsToDraw = Math.min(baseCardsToDraw, this.deck.length);
     for (let i = 0; i < cardsToDraw; i++) {
       if (this.deck.length > 0) {
         player.hand.push(this.deck.pop());

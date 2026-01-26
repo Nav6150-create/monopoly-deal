@@ -82,6 +82,16 @@ function setupEventListeners() {
   // Rent chart modal
   document.getElementById('close-rent').addEventListener('click', () => hideModal('rent'));
 
+  // Modal close buttons (X buttons)
+  document.querySelectorAll('.modal-close-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const modalName = btn.dataset.modal;
+      hideModal(modalName);
+      selectedCard = null;
+      selectedTarget = null;
+    });
+  });
+
   // Socket events
   socket.on('gameCreated', handleGameCreated);
   socket.on('gameJoined', handleGameJoined);
@@ -591,18 +601,54 @@ function renderBank(bank) {
   let total = 0;
   container.innerHTML = '';
 
+  // Group bank cards by value
+  const groupedByValue = {};
   bank.forEach((card, index) => {
     total += card.value;
-    const div = document.createElement('div');
-    div.className = 'game-card mini';
-    div.style.borderTopColor = '#27ae60';
-    div.innerHTML = `
-      <div class="card-header"><span class="card-value">$${card.value}</span></div>
-      <div class="card-body" style="background: #27ae60; color: white; margin: 3px; border-radius: 3px;">$${card.value}</div>
-    `;
-    div.dataset.index = index;
-    div.dataset.type = 'bank';
-    container.appendChild(div);
+    if (!groupedByValue[card.value]) {
+      groupedByValue[card.value] = [];
+    }
+    groupedByValue[card.value].push({ card, index });
+  });
+
+  // Render stacked groups
+  Object.entries(groupedByValue).forEach(([value, cards]) => {
+    const stackDiv = document.createElement('div');
+    stackDiv.className = 'bank-stack';
+    const stackWidth = 48 + (cards.length - 1) * 8;
+    stackDiv.style.width = `${stackWidth}px`;
+    stackDiv.style.height = '68px';
+    stackDiv.style.position = 'relative';
+    stackDiv.style.display = 'inline-block';
+    stackDiv.style.marginRight = '8px';
+    stackDiv.style.marginBottom = '4px';
+
+    cards.forEach((item, stackIndex) => {
+      const div = document.createElement('div');
+      div.className = 'game-card mini';
+      div.style.borderTopColor = '#27ae60';
+      div.style.position = 'absolute';
+      div.style.left = `${stackIndex * 8}px`;
+      div.style.top = '0';
+      div.style.zIndex = stackIndex;
+      div.innerHTML = `
+        <div class="card-header"><span class="card-value">$${item.card.value}</span></div>
+        <div class="card-body" style="background: #27ae60; color: white; margin: 3px; border-radius: 3px;">$${item.card.value}</div>
+      `;
+      div.dataset.index = item.index;
+      div.dataset.type = 'bank';
+      stackDiv.appendChild(div);
+    });
+
+    // Add count badge if more than 1
+    if (cards.length > 1) {
+      const badge = document.createElement('span');
+      badge.className = 'bank-count-badge';
+      badge.textContent = `×${cards.length}`;
+      stackDiv.appendChild(badge);
+    }
+
+    container.appendChild(stackDiv);
   });
 
   totalEl.textContent = total;
@@ -1227,11 +1273,21 @@ function showPropertySelection(title, completeOnly, callback) {
     container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">No valid targets</div>';
   }
 
+  // Set proper button text (not Just Say No)
+  document.getElementById('target-cancel').textContent = 'Cancel';
+  document.getElementById('target-cancel').style.display = 'block';
+  document.getElementById('target-confirm').textContent = 'Steal';
+
   selectedTarget = null;
   document.getElementById('target-confirm').disabled = true;
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
     callback(selectedTarget);
+  };
+  document.getElementById('target-cancel').onclick = () => {
+    hideModal('target');
+    selectedCard = null;
+    selectedTarget = null;
   };
 
   showModal('target');
@@ -1279,11 +1335,21 @@ function showMySetSelection(title, callback) {
     container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">No complete sets available</div>';
   }
 
+  // Set proper button text
+  document.getElementById('target-cancel').textContent = 'Cancel';
+  document.getElementById('target-cancel').style.display = 'block';
+  document.getElementById('target-confirm').textContent = 'Add';
+
   selectedTarget = null;
   document.getElementById('target-confirm').disabled = true;
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
     callback(selectedTarget);
+  };
+  document.getElementById('target-cancel').onclick = () => {
+    hideModal('target');
+    selectedCard = null;
+    selectedTarget = null;
   };
 
   showModal('target');
@@ -1393,12 +1459,21 @@ function showForcedDealStep1() {
     container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">No properties available to take</div>';
   }
 
+  // Set button text for Step 1
+  document.getElementById('target-cancel').textContent = 'Cancel';
+  document.getElementById('target-cancel').style.display = 'block';
+  document.getElementById('target-confirm').textContent = 'Select';
   document.getElementById('target-confirm').disabled = true;
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
     if (forcedDealState.theirProperty) {
       showForcedDealStep2();
     }
+  };
+  document.getElementById('target-cancel').onclick = () => {
+    hideModal('target');
+    selectedCard = null;
+    forcedDealState = { cardIndex: null, theirProperty: null, yourProperty: null };
   };
 
   showModal('target');
@@ -1442,6 +1517,10 @@ function showForcedDealStep2() {
     container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">No properties to give</div>';
   }
 
+  // Set button text for Step 2
+  document.getElementById('target-cancel').textContent = 'Back';
+  document.getElementById('target-cancel').style.display = 'block';
+  document.getElementById('target-confirm').textContent = 'Confirm Trade';
   document.getElementById('target-confirm').disabled = true;
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
@@ -1460,6 +1539,10 @@ function showForcedDealStep2() {
       selectedCard = null;
       forcedDealState = { cardIndex: null, theirProperty: null, yourProperty: null };
     }
+  };
+  document.getElementById('target-cancel').onclick = () => {
+    hideModal('target');
+    showForcedDealStep1();
   };
 
   showModal('target');
@@ -1610,10 +1693,10 @@ function showStealConfirmModal(action) {
   // Check for Say No card
   const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
 
-  // Update buttons
+  // Update buttons - Only show Just Say No if player has one
   document.getElementById('target-confirm').textContent = 'Accept';
   document.getElementById('target-confirm').disabled = false;
-  document.getElementById('target-cancel').textContent = hasSayNo ? 'Just Say No!' : 'Cancel';
+  document.getElementById('target-cancel').textContent = 'Just Say No!';
   document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
 
   document.getElementById('target-confirm').onclick = () => {
@@ -1672,10 +1755,10 @@ function showForcedDealConfirmModal(action) {
   // Check for Say No card
   const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
 
-  // Update buttons
+  // Update buttons - Only show Just Say No if player has one
   document.getElementById('target-confirm').textContent = 'Accept Trade';
   document.getElementById('target-confirm').disabled = false;
-  document.getElementById('target-cancel').textContent = hasSayNo ? 'Just Say No!' : 'Cancel';
+  document.getElementById('target-cancel').textContent = 'Just Say No!';
   document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
 
   document.getElementById('target-confirm').onclick = () => {

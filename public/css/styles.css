@@ -290,6 +290,34 @@ body {
   max-width: 440px;
   box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.1);
   border: 1px solid rgba(255,255,255,0.08);
+  position: relative;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 24px;
+  font-weight: 400;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  transform: scale(1.1);
 }
 
 .modal-content.modal-large {
@@ -861,8 +889,7 @@ body {
 
 .player-properties {
   flex: 2;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: auto;
 }
 
 .player-properties h4, .player-bank h4 {
@@ -955,6 +982,25 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.bank-stack {
+  position: relative;
+  display: inline-block;
+}
+
+.bank-count-badge {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  background: linear-gradient(145deg, #27ae60, #1e8449);
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 20;
 }
 
 /* Cards - Major Enhancement */

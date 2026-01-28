@@ -319,6 +319,10 @@ function updatePlayAgainStatus(votes) {
   const statusDiv = document.getElementById('play-again-status');
   let html = '<h4>Play Again?</h4><div class="play-again-votes">';
 
+  // Check if I have voted
+  const myVote = votes.find(v => v.id === myPlayerId);
+  const iHaveVoted = myVote && myVote.accepted === true;
+
   votes.forEach(vote => {
     const statusClass = vote.accepted === true ? 'accepted' :
                         vote.accepted === false ? 'declined' : 'pending';
@@ -332,10 +336,24 @@ function updatePlayAgainStatus(votes) {
 
   html += '</div>';
   statusDiv.innerHTML = html;
+
+  // Update button state based on whether I've voted
+  const playAgainBtn = document.getElementById('play-again-btn');
+  if (iHaveVoted) {
+    playAgainBtn.disabled = true;
+    playAgainBtn.textContent = 'Waiting for others...';
+  } else {
+    playAgainBtn.disabled = false;
+    playAgainBtn.textContent = 'Play Again';
+  }
 }
 
 function handleGameRestarted() {
   hideModal('gameover');
+  // Reset the play again UI
+  document.getElementById('play-again-btn').disabled = false;
+  document.getElementById('play-again-btn').textContent = 'Play Again';
+  document.getElementById('play-again-status').classList.add('hidden');
   showToast('New game starting!', 'success');
 }
 
@@ -404,10 +422,12 @@ function renderGame() {
     // Check if someone just used Say No (and it wasn't us)
     if (gameState.pendingAction.sayNoUsedBy &&
         gameState.pendingAction.sayNoUsedBy.playerId !== myPlayerId) {
-      const sayNoKey = `${gameState.pendingAction.sayNoUsedBy.playerId}-${Date.now()}`;
+      // Create unique key including chain count to show notification for each Say No in a chain
+      const chainCount = gameState.pendingAction.sayNoChain?.count || 0;
+      const sayNoKey = `${gameState.pendingAction.sayNoUsedBy.playerId}-${gameState.pendingAction.type}-${chainCount}`;
       // Only show if we haven't shown this one yet
-      if (lastSayNoUsedBy !== gameState.pendingAction.sayNoUsedBy.playerId + gameState.pendingAction.type) {
-        lastSayNoUsedBy = gameState.pendingAction.sayNoUsedBy.playerId + gameState.pendingAction.type;
+      if (lastSayNoUsedBy !== sayNoKey) {
+        lastSayNoUsedBy = sayNoKey;
         showSayNoNotification(gameState.pendingAction.sayNoUsedBy.playerName);
       }
     }

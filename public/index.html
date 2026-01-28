@@ -221,6 +221,27 @@
         <button id="draw-btn" class="btn btn-action">Draw Cards</button>
         <button id="end-turn-btn" class="btn btn-action" disabled>End Turn</button>
       </div>
+
+      <!-- Chat Panel -->
+      <div id="chat-panel" class="chat-panel collapsed">
+        <button id="chat-toggle" class="chat-toggle">
+          <span class="chat-icon">&#128172;</span>
+          <span id="chat-badge" class="chat-badge hidden">0</span>
+        </button>
+        <div class="chat-content">
+          <div class="chat-header">
+            <h4>Game Chat</h4>
+            <button id="chat-close" class="chat-close">&times;</button>
+          </div>
+          <div id="chat-messages" class="chat-messages">
+            <!-- Chat messages will appear here -->
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200" autocomplete="off">
+            <button id="chat-send" class="btn btn-primary btn-small">Send</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

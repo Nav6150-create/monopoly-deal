@@ -259,6 +259,34 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Chat message
+  socket.on('chatMessage', (message) => {
+    const playerInfo = playerSockets.get(socket.id);
+    if (!playerInfo) return;
+
+    const game = games.get(playerInfo.gameCode);
+    if (!game) return;
+
+    const player = game.players.find(p => p.id === playerInfo.playerId);
+    if (!player) return;
+
+    // Sanitize message (basic XSS prevention)
+    const sanitizedMessage = message
+      .substring(0, 200)
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    if (sanitizedMessage.trim().length === 0) return;
+
+    // Broadcast to all players in the game
+    io.to(playerInfo.gameCode).emit('chatMessage', {
+      playerId: playerInfo.playerId,
+      playerName: player.name,
+      message: sanitizedMessage,
+      timestamp: Date.now()
+    });
+  });
+
   // Handle disconnect
   socket.on('disconnect', () => {
     const playerInfo = playerSockets.get(socket.id);

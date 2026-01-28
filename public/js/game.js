@@ -104,6 +104,15 @@ function setupEventListeners() {
   socket.on('playAgainRequested', handlePlayAgainRequested);
   socket.on('playAgainUpdate', handlePlayAgainUpdate);
   socket.on('gameRestarted', handleGameRestarted);
+  socket.on('chatMessage', handleChatMessage);
+
+  // Chat event listeners
+  document.getElementById('chat-toggle').addEventListener('click', toggleChat);
+  document.getElementById('chat-close').addEventListener('click', toggleChat);
+  document.getElementById('chat-send').addEventListener('click', sendChatMessage);
+  document.getElementById('chat-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+  });
 }
 
 // Check URL for game code
@@ -282,6 +291,9 @@ function handleGameStarted(state) {
   gameState = state;
   showScreen('game');
   renderGame();
+  // Clear chat and add game started message
+  clearChat();
+  addSystemChatMessage('Game started! Good luck!');
 }
 
 function handleGameState(state) {
@@ -296,6 +308,7 @@ function handleGameOver(data) {
   document.getElementById('play-again-btn').textContent = 'Play Again';
   document.getElementById('play-again-status').classList.add('hidden');
   showModal('gameover');
+  addSystemChatMessage(`${data.winnerName} wins the game!`);
 }
 
 function requestPlayAgain() {
@@ -2229,6 +2242,88 @@ function showRentChart(color, colorInfo, playerCards) {
   }
 
   showModal('rent');
+}
+
+// Chat functionality
+let chatUnreadCount = 0;
+let chatOpen = false;
+
+function toggleChat() {
+  const chatPanel = document.getElementById('chat-panel');
+  chatOpen = !chatOpen;
+
+  if (chatOpen) {
+    chatPanel.classList.remove('collapsed');
+    chatUnreadCount = 0;
+    updateChatBadge();
+    // Focus input when opening
+    document.getElementById('chat-input').focus();
+    // Scroll to bottom
+    const messages = document.getElementById('chat-messages');
+    messages.scrollTop = messages.scrollHeight;
+  } else {
+    chatPanel.classList.add('collapsed');
+  }
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const message = input.value.trim();
+
+  if (message.length === 0) return;
+
+  socket.emit('chatMessage', message);
+  input.value = '';
+  input.focus();
+}
+
+function handleChatMessage(data) {
+  const messagesContainer = document.getElementById('chat-messages');
+  const isOwnMessage = data.playerId === myPlayerId;
+
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `chat-message ${isOwnMessage ? 'own' : 'other'}`;
+
+  messageDiv.innerHTML = `
+    <span class="sender">${escapeHtml(data.playerName)}</span>
+    <span class="text">${data.message}</span>
+  `;
+
+  messagesContainer.appendChild(messageDiv);
+
+  // Scroll to bottom
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+  // Update unread count if chat is closed and message is from another player
+  if (!chatOpen && !isOwnMessage) {
+    chatUnreadCount++;
+    updateChatBadge();
+  }
+}
+
+function updateChatBadge() {
+  const badge = document.getElementById('chat-badge');
+  if (chatUnreadCount > 0) {
+    badge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function addSystemChatMessage(message) {
+  const messagesContainer = document.getElementById('chat-messages');
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'chat-message system';
+  messageDiv.innerHTML = `<span class="text">${escapeHtml(message)}</span>`;
+  messagesContainer.appendChild(messageDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function clearChat() {
+  document.getElementById('chat-messages').innerHTML = '';
+  chatUnreadCount = 0;
+  updateChatBadge();
 }
 
 // Initialize

@@ -2263,6 +2263,8 @@ function toggleChat() {
     messages.scrollTop = messages.scrollHeight;
   } else {
     chatPanel.classList.add('collapsed');
+    // Reset position when closing
+    resetChatPosition();
   }
 }
 
@@ -2326,5 +2328,95 @@ function clearChat() {
   updateChatBadge();
 }
 
+// Chat drag functionality
+let isDraggingChat = false;
+let chatDragOffsetX = 0;
+let chatDragOffsetY = 0;
+
+function initChatDrag() {
+  const chatPanel = document.getElementById('chat-panel');
+  const dragHandle = document.getElementById('chat-drag-handle');
+
+  dragHandle.addEventListener('mousedown', startChatDrag);
+  dragHandle.addEventListener('touchstart', startChatDrag, { passive: false });
+
+  document.addEventListener('mousemove', dragChat);
+  document.addEventListener('touchmove', dragChat, { passive: false });
+
+  document.addEventListener('mouseup', stopChatDrag);
+  document.addEventListener('touchend', stopChatDrag);
+}
+
+function startChatDrag(e) {
+  // Don't drag if clicking the close button
+  if (e.target.id === 'chat-close') return;
+
+  const chatPanel = document.getElementById('chat-panel');
+  isDraggingChat = true;
+  chatPanel.classList.add('dragging');
+
+  const rect = chatPanel.getBoundingClientRect();
+  const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+  const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+  chatDragOffsetX = clientX - rect.left;
+  chatDragOffsetY = clientY - rect.top;
+
+  if (e.type === 'touchstart') {
+    e.preventDefault();
+  }
+}
+
+function dragChat(e) {
+  if (!isDraggingChat) return;
+
+  const chatPanel = document.getElementById('chat-panel');
+  const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+  const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+  // Calculate new position
+  let newX = clientX - chatDragOffsetX;
+  let newY = clientY - chatDragOffsetY;
+
+  // Get panel dimensions
+  const panelRect = chatPanel.getBoundingClientRect();
+  const panelWidth = panelRect.width;
+  const panelHeight = panelRect.height;
+
+  // Constrain to viewport
+  const maxX = window.innerWidth - panelWidth;
+  const maxY = window.innerHeight - panelHeight;
+
+  newX = Math.max(0, Math.min(newX, maxX));
+  newY = Math.max(0, Math.min(newY, maxY));
+
+  // Apply position (switch from bottom/right to top/left positioning)
+  chatPanel.style.left = newX + 'px';
+  chatPanel.style.top = newY + 'px';
+  chatPanel.style.right = 'auto';
+  chatPanel.style.bottom = 'auto';
+
+  if (e.type === 'touchmove') {
+    e.preventDefault();
+  }
+}
+
+function stopChatDrag() {
+  if (isDraggingChat) {
+    const chatPanel = document.getElementById('chat-panel');
+    isDraggingChat = false;
+    chatPanel.classList.remove('dragging');
+  }
+}
+
+function resetChatPosition() {
+  const chatPanel = document.getElementById('chat-panel');
+  chatPanel.style.left = '';
+  chatPanel.style.top = '';
+  chatPanel.style.right = '20px';
+  chatPanel.style.bottom = '20px';
+}
+
 // Initialize
 init();
+initChatDrag();

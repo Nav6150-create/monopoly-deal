@@ -238,18 +238,34 @@ io.on('connection', (socket) => {
   // Request play again
   socket.on('requestPlayAgain', () => {
     const playerInfo = playerSockets.get(socket.id);
-    if (!playerInfo) return;
+    if (!playerInfo) {
+      console.log('requestPlayAgain: No player info found');
+      return;
+    }
 
     const game = games.get(playerInfo.gameCode);
-    if (!game || game.state !== 'finished') return;
+    if (!game) {
+      console.log('requestPlayAgain: No game found');
+      return;
+    }
+    if (game.state !== 'finished') {
+      console.log('requestPlayAgain: Game state is not finished, state =', game.state);
+      return;
+    }
 
+    console.log(`requestPlayAgain: Player ${playerInfo.playerId} requested play again`);
     const status = game.initPlayAgain(playerInfo.playerId);
+    console.log('requestPlayAgain: Current votes:', JSON.stringify(status.votes));
 
     // Notify all players about the play again request
     io.to(playerInfo.gameCode).emit('playAgainRequested', status);
 
     // Check if all players accepted
-    if (game.checkAllPlayersAccepted()) {
+    const allAccepted = game.checkAllPlayersAccepted();
+    console.log('requestPlayAgain: All players accepted?', allAccepted);
+
+    if (allAccepted) {
+      console.log('requestPlayAgain: All players accepted! Restarting game...');
       game.restartGame();
 
       // Notify all players that game is restarting
@@ -259,7 +275,10 @@ io.on('connection', (socket) => {
       game.players.forEach(p => {
         const playerSocket = io.sockets.sockets.get(p.socketId);
         if (playerSocket) {
+          console.log(`requestPlayAgain: Sending gameStarted to player ${p.name}`);
           playerSocket.emit('gameStarted', game.getStateForPlayer(p.id));
+        } else {
+          console.log(`requestPlayAgain: No socket found for player ${p.name}`);
         }
       });
 

@@ -291,6 +291,7 @@ function startGame() {
 let hasShownSpinWheel = false;
 
 function handleGameStarted(state) {
+  console.log('handleGameStarted: Received game state:', state);
   gameState = state;
   // Hide any open modals (especially gameover modal on restart)
   hideModal('gameover');
@@ -300,12 +301,15 @@ function handleGameStarted(state) {
 
   // Show spin wheel animation to determine starting player
   if (state.startingPlayerId && state.players.length >= 2) {
+    console.log('handleGameStarted: Showing spin wheel for starting player:', state.startingPlayerId);
     showSpinWheel(state.players, state.startingPlayerId, () => {
+      console.log('handleGameStarted: Spin wheel complete, showing game');
       showScreen('game');
       renderGame();
       addSystemChatMessage('Game started! Good luck!');
     });
   } else {
+    console.log('handleGameStarted: No spin wheel, showing game directly');
     showScreen('game');
     renderGame();
     addSystemChatMessage('Game started! Good luck!');
@@ -328,12 +332,14 @@ function handleGameOver(data) {
 }
 
 function requestPlayAgain() {
+  console.log('requestPlayAgain: Emitting requestPlayAgain');
   socket.emit('requestPlayAgain');
   document.getElementById('play-again-btn').disabled = true;
   document.getElementById('play-again-btn').textContent = 'Waiting...';
 }
 
 function handlePlayAgainRequested(data) {
+  console.log('handlePlayAgainRequested: Received data:', data);
   // Show the play again status section
   const statusDiv = document.getElementById('play-again-status');
   statusDiv.classList.remove('hidden');
@@ -378,6 +384,7 @@ function updatePlayAgainStatus(votes) {
 }
 
 function handleGameRestarted() {
+  console.log('handleGameRestarted: Game is restarting!');
   hideModal('gameover');
   // Reset the play again UI
   document.getElementById('play-again-btn').disabled = false;

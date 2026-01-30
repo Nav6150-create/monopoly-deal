@@ -221,6 +221,14 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // If Say No was used, broadcast notification to all players
+    if (result.sayNoUsedBy) {
+      io.to(playerInfo.gameCode).emit('sayNoUsed', {
+        playerId: result.sayNoUsedBy.playerId,
+        playerName: result.sayNoUsedBy.playerName
+      });
+    }
+
     // Try to auto-end turn after action resolves
     game.tryAutoEndTurn();
 

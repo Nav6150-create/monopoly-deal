@@ -105,6 +105,7 @@ function setupEventListeners() {
   socket.on('playAgainUpdate', handlePlayAgainUpdate);
   socket.on('gameRestarted', handleGameRestarted);
   socket.on('chatMessage', handleChatMessage);
+  socket.on('sayNoUsed', handleSayNoUsed);
 
   // Chat event listeners
   document.getElementById('chat-toggle').addEventListener('click', toggleChat);
@@ -287,13 +288,28 @@ function startGame() {
 }
 
 // Game state handling
+let hasShownSpinWheel = false;
+
 function handleGameStarted(state) {
   gameState = state;
-  showScreen('game');
-  renderGame();
-  // Clear chat and add game started message
+  // Hide any open modals (especially gameover modal on restart)
+  hideModal('gameover');
+
+  // Clear chat
   clearChat();
-  addSystemChatMessage('Game started! Good luck!');
+
+  // Show spin wheel animation to determine starting player
+  if (state.startingPlayerId && state.players.length >= 2) {
+    showSpinWheel(state.players, state.startingPlayerId, () => {
+      showScreen('game');
+      renderGame();
+      addSystemChatMessage('Game started! Good luck!');
+    });
+  } else {
+    showScreen('game');
+    renderGame();
+    addSystemChatMessage('Game started! Good luck!');
+  }
 }
 
 function handleGameState(state) {
@@ -432,22 +448,7 @@ function renderGame() {
 
   // Handle pending actions
   if (gameState.pendingAction) {
-    // Check if someone just used Say No (and it wasn't us)
-    if (gameState.pendingAction.sayNoUsedBy &&
-        gameState.pendingAction.sayNoUsedBy.playerId !== myPlayerId) {
-      // Create unique key including chain count to show notification for each Say No in a chain
-      const chainCount = gameState.pendingAction.sayNoChain?.count || 0;
-      const sayNoKey = `${gameState.pendingAction.sayNoUsedBy.playerId}-${gameState.pendingAction.type}-${chainCount}`;
-      // Only show if we haven't shown this one yet
-      if (lastSayNoUsedBy !== sayNoKey) {
-        lastSayNoUsedBy = sayNoKey;
-        showSayNoNotification(gameState.pendingAction.sayNoUsedBy.playerName);
-      }
-    }
     handlePendingAction();
-  } else {
-    // Reset Say No tracking when action resolves
-    lastSayNoUsedBy = null;
   }
 
   // Handle must discard - show persistent message
@@ -2133,13 +2134,85 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+// Spin Wheel Animation
+const wheelColors = [
+  '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+  '#1abc9c', '#e67e22', '#34495e'
+];
+
+function showSpinWheel(players, winningPlayerId, onComplete) {
+  const overlay = document.getElementById('spin-wheel-overlay');
+  const wheel = document.getElementById('spin-wheel');
+  const resultDiv = document.getElementById('spin-wheel-result');
+
+  // Clear previous
+  wheel.innerHTML = '';
+  resultDiv.textContent = '';
+  wheel.style.transform = 'rotate(0deg)';
+
+  // Create segments
+  const segmentAngle = 360 / players.length;
+  players.forEach((player, index) => {
+    const segment = document.createElement('div');
+    segment.className = 'spin-wheel-segment';
+    segment.style.background = wheelColors[index % wheelColors.length];
+
+    // Calculate rotation for this segment
+    // Each segment starts at -90deg (top) and rotates by its index * segmentAngle
+    const rotation = -90 - segmentAngle / 2 + index * segmentAngle;
+    segment.style.transform = `rotate(${rotation}deg) skewY(${90 - segmentAngle}deg)`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = player.name;
+    nameSpan.style.transform = `skewY(${-(90 - segmentAngle)}deg) rotate(${segmentAngle / 2}deg)`;
+    segment.appendChild(nameSpan);
+
+    wheel.appendChild(segment);
+  });
+
+  // Show overlay
+  overlay.classList.remove('hidden');
+
+  // Calculate winning rotation
+  const winningIndex = players.findIndex(p => p.id === winningPlayerId);
+  // The pointer is at the top (0 degrees), we need to rotate so the winning segment is at the top
+  // Add extra rotations for effect (5-8 full spins)
+  const extraSpins = 5 + Math.random() * 3;
+  const winningAngle = winningIndex * segmentAngle;
+  // We need to rotate the wheel so that the winning segment ends up at the top (under the pointer)
+  const finalRotation = extraSpins * 360 + (360 - winningAngle);
+
+  // Start spinning after a brief delay
+  setTimeout(() => {
+    wheel.style.transform = `rotate(${finalRotation}deg)`;
+  }, 500);
+
+  // Show result and hide after spin completes
+  setTimeout(() => {
+    const winner = players.find(p => p.id === winningPlayerId);
+    resultDiv.textContent = `${winner.name} goes first!`;
+  }, 4500);
+
+  // Hide overlay and continue
+  setTimeout(() => {
+    overlay.classList.add('hidden');
+    if (onComplete) onComplete();
+  }, 6000);
+}
+
 // Just Say No notification popup
 let lastSayNoUsedBy = null;
 
-function showSayNoNotification(playerName) {
+function handleSayNoUsed(data) {
+  // Show notification for all players (including the one who used it, as confirmation)
+  showSayNoNotification(data.playerName, data.playerId === myPlayerId);
+}
+
+function showSayNoNotification(playerName, isMe = false) {
   // Create overlay
   const overlay = document.createElement('div');
   overlay.className = 'say-no-overlay';
+  const message = isMe ? 'You blocked the action!' : `${escapeHtml(playerName)} blocked the action!`;
   overlay.innerHTML = `
     <div class="say-no-popup">
       <div class="say-no-icon">
@@ -2149,7 +2222,7 @@ function showSayNoNotification(playerName) {
         </svg>
       </div>
       <h2>Just Say No!</h2>
-      <p>${escapeHtml(playerName)} blocked the action!</p>
+      <p>${message}</p>
     </div>
   `;
 

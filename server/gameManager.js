@@ -231,7 +231,11 @@ class GameManager {
     this.state = 'playing';
     this.deck = shuffle(createDeck());
     this.discardPile = [];
-    this.currentPlayerIndex = 0;
+
+    // Randomize starting player
+    this.currentPlayerIndex = Math.floor(Math.random() * this.players.length);
+    this.startingPlayerId = this.players[this.currentPlayerIndex].id;
+
     this.actionsThisTurn = 0;
     this.hasDrawnThisTurn = false;
 
@@ -1182,11 +1186,14 @@ class GameManager {
   getStateForPlayer(playerId) {
     const player = this.players.find(p => p.id === playerId);
     const currentPlayer = this.getCurrentPlayer();
+    const startingPlayer = this.startingPlayerId ? this.players.find(p => p.id === this.startingPlayerId) : null;
 
     return {
       gameCode: this.gameCode,
       state: this.state,
       currentPlayerId: currentPlayer ? currentPlayer.id : null,
+      startingPlayerId: this.startingPlayerId || null,
+      startingPlayerName: startingPlayer ? startingPlayer.name : null,
       actionsRemaining: this.maxActionsPerTurn - this.actionsThisTurn,
       hasDrawnThisTurn: this.hasDrawnThisTurn,
       deckCount: this.deck.length,
@@ -1235,7 +1242,11 @@ class GameManager {
   restartGame() {
     // Reset game state but keep players
     this.state = 'playing';
-    this.currentPlayerIndex = 0;
+
+    // Randomize starting player
+    this.currentPlayerIndex = Math.floor(Math.random() * this.players.length);
+    this.startingPlayerId = this.players[this.currentPlayerIndex].id;
+
     this.deck = createDeck();
     this.shuffleDeck();
     this.discardPile = [];
@@ -1260,6 +1271,9 @@ class GameManager {
         }
       }
     });
+
+    // Auto-draw 2 cards for the first player
+    this.autoDrawForCurrentPlayer();
   }
 }
 

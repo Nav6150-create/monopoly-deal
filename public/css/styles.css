@@ -2428,3 +2428,126 @@ body {
     height: 350px;
   }
 }
+
+/* Spin Wheel Animation */
+.spin-wheel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  animation: fadeIn 0.3s ease;
+}
+
+.spin-wheel-overlay.hidden {
+  display: none;
+}
+
+.spin-wheel-container {
+  text-align: center;
+}
+
+.spin-wheel-container h2 {
+  color: white;
+  font-size: 28px;
+  margin-bottom: 30px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.spin-wheel-wrapper {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  margin: 0 auto;
+}
+
+.spin-wheel-pointer {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 30px solid #f1c40f;
+  z-index: 10;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.4));
+}
+
+.spin-wheel {
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3);
+  border: 6px solid white;
+  transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+
+.spin-wheel.spinning {
+  /* Animation handled by JS */
+}
+
+.spin-wheel-segment {
+  position: absolute;
+  width: 50%;
+  height: 50%;
+  left: 50%;
+  top: 50%;
+  transform-origin: 0% 0%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 15px;
+  box-sizing: border-box;
+  font-weight: 700;
+  font-size: 12px;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.spin-wheel-segment span {
+  transform: rotate(90deg);
+  white-space: nowrap;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spin-wheel-result {
+  margin-top: 30px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #f1c40f;
+  text-shadow: 0 2px 10px rgba(241, 196, 15, 0.4);
+  min-height: 40px;
+}
+
+@media (max-width: 600px) {
+  .spin-wheel-wrapper {
+    width: 220px;
+    height: 220px;
+  }
+
+  .spin-wheel {
+    width: 220px;
+    height: 220px;
+  }
+
+  .spin-wheel-container h2 {
+    font-size: 22px;
+  }
+
+  .spin-wheel-segment {
+    font-size: 10px;
+    padding-right: 10px;
+  }
+}

@@ -68,7 +68,7 @@ function createDeck() {
         type: CARD_TYPES.PROPERTY,
         color,
         name,
-        value: color === 'BLUE' ? 4 : color === 'GREEN' ? 4 : color === 'RAILROAD' ? 2 : color === 'BROWN' ? 1 : 2
+        value: { BROWN: 1, LIGHT_BLUE: 1, PINK: 2, ORANGE: 2, RED: 3, YELLOW: 3, GREEN: 4, BLUE: 4, RAILROAD: 2, UTILITY: 2 }[color]
       });
     });
   });
@@ -118,7 +118,7 @@ function createDeck() {
     { name: "It's My Birthday", count: 3, value: 2, action: 'birthday' },
     { name: 'Pass Go', count: 10, value: 1, action: 'passGo' },
     { name: 'House', count: 3, value: 3, action: 'house' },
-    { name: 'Hotel', count: 2, value: 4, action: 'hotel' },
+    { name: 'Hotel', count: 3, value: 4, action: 'hotel' },
     { name: 'Double The Rent', count: 2, value: 1, action: 'doubleRent' }
   ];
 
@@ -1247,8 +1247,7 @@ class GameManager {
     this.currentPlayerIndex = Math.floor(Math.random() * this.players.length);
     this.startingPlayerId = this.players[this.currentPlayerIndex].id;
 
-    this.deck = createDeck();
-    this.shuffleDeck();
+    this.deck = shuffle(createDeck());
     this.discardPile = [];
     this.actionsThisTurn = 0;
     this.hasDrawnThisTurn = false;

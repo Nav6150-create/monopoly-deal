@@ -288,7 +288,6 @@ function startGame() {
 }
 
 // Game state handling
-let hasShownSpinWheel = false;
 
 function handleGameStarted(state) {
   console.log('handleGameStarted: Received game state:', state);
@@ -299,21 +298,14 @@ function handleGameStarted(state) {
   // Clear chat
   clearChat();
 
-  // Show spin wheel animation to determine starting player
-  if (state.startingPlayerId && state.players.length >= 2) {
-    console.log('handleGameStarted: Showing spin wheel for starting player:', state.startingPlayerId);
-    showSpinWheel(state.players, state.startingPlayerId, () => {
-      console.log('handleGameStarted: Spin wheel complete, showing game');
-      showScreen('game');
-      renderGame();
-      addSystemChatMessage('Game started! Good luck!');
-    });
-  } else {
-    console.log('handleGameStarted: No spin wheel, showing game directly');
-    showScreen('game');
-    renderGame();
-    addSystemChatMessage('Game started! Good luck!');
+  showScreen('game');
+  renderGame();
+
+  const startingPlayer = state.players.find(p => p.id === state.startingPlayerId);
+  if (startingPlayer) {
+    addSystemChatMessage(`${startingPlayer.name} goes first!`);
   }
+  addSystemChatMessage('Game started! Good luck!');
 }
 
 function handleGameState(state) {
@@ -1698,6 +1690,10 @@ function showCounterSayNoModal(action) {
   // Check if I have a Say No card
   const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
 
+  // Hide the close button so player must respond
+  const closeBtn = document.querySelector('#target-modal .modal-close-btn');
+  if (closeBtn) closeBtn.style.display = 'none';
+
   // Update buttons
   document.getElementById('target-confirm').textContent = 'Let it go';
   document.getElementById('target-confirm').disabled = false;
@@ -1706,12 +1702,14 @@ function showCounterSayNoModal(action) {
 
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
+    if (closeBtn) closeBtn.style.display = '';
     socket.emit('respondToAction', { response: 'declineCounter' });
   };
 
   document.getElementById('target-cancel').onclick = () => {
     if (hasSayNo) {
       hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
       socket.emit('respondToAction', { response: 'counterSayNo' });
     }
   };
@@ -1769,23 +1767,40 @@ function showStealConfirmModal(action) {
   // Check for Say No card
   const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
 
-  // Update buttons - Only show Just Say No if player has one
-  document.getElementById('target-confirm').textContent = 'Accept';
-  document.getElementById('target-confirm').disabled = false;
-  document.getElementById('target-cancel').textContent = 'Just Say No!';
-  document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
+  // Hide the close button so player must respond
+  const closeBtn = document.querySelector('#target-modal .modal-close-btn');
+  if (closeBtn) closeBtn.style.display = 'none';
 
-  document.getElementById('target-confirm').onclick = () => {
-    hideModal('target');
-    socket.emit('respondToAction', { response: 'accept' });
-  };
+  if (hasSayNo) {
+    // Player can choose to accept or block
+    document.getElementById('target-confirm').textContent = 'Accept';
+    document.getElementById('target-confirm').disabled = false;
+    document.getElementById('target-cancel').textContent = 'Just Say No!';
+    document.getElementById('target-cancel').style.display = 'block';
 
-  document.getElementById('target-cancel').onclick = () => {
-    if (hasSayNo) {
+    document.getElementById('target-confirm').onclick = () => {
       hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
+      socket.emit('respondToAction', { response: 'accept' });
+    };
+
+    document.getElementById('target-cancel').onclick = () => {
+      hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
       socket.emit('respondToAction', { response: 'sayNo' });
-    }
-  };
+    };
+  } else {
+    // No choice - just inform and auto-accept
+    document.getElementById('target-confirm').textContent = 'OK';
+    document.getElementById('target-confirm').disabled = false;
+    document.getElementById('target-cancel').style.display = 'none';
+
+    document.getElementById('target-confirm').onclick = () => {
+      hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
+      socket.emit('respondToAction', { response: 'accept' });
+    };
+  }
 
   showModal('target');
 }
@@ -1831,23 +1846,40 @@ function showForcedDealConfirmModal(action) {
   // Check for Say No card
   const hasSayNo = myPlayer.hand.some(c => c.action === 'sayNo');
 
-  // Update buttons - Only show Just Say No if player has one
-  document.getElementById('target-confirm').textContent = 'Accept Trade';
-  document.getElementById('target-confirm').disabled = false;
-  document.getElementById('target-cancel').textContent = 'Just Say No!';
-  document.getElementById('target-cancel').style.display = hasSayNo ? 'block' : 'none';
+  // Hide the close button so player must respond
+  const closeBtn = document.querySelector('#target-modal .modal-close-btn');
+  if (closeBtn) closeBtn.style.display = 'none';
 
-  document.getElementById('target-confirm').onclick = () => {
-    hideModal('target');
-    socket.emit('respondToAction', { response: 'accept' });
-  };
+  if (hasSayNo) {
+    // Player can choose to accept or block
+    document.getElementById('target-confirm').textContent = 'Accept Trade';
+    document.getElementById('target-confirm').disabled = false;
+    document.getElementById('target-cancel').textContent = 'Just Say No!';
+    document.getElementById('target-cancel').style.display = 'block';
 
-  document.getElementById('target-cancel').onclick = () => {
-    if (hasSayNo) {
+    document.getElementById('target-confirm').onclick = () => {
       hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
+      socket.emit('respondToAction', { response: 'accept' });
+    };
+
+    document.getElementById('target-cancel').onclick = () => {
+      hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
       socket.emit('respondToAction', { response: 'sayNo' });
-    }
-  };
+    };
+  } else {
+    // No choice - just inform and auto-accept
+    document.getElementById('target-confirm').textContent = 'OK';
+    document.getElementById('target-confirm').disabled = false;
+    document.getElementById('target-cancel').style.display = 'none';
+
+    document.getElementById('target-confirm').onclick = () => {
+      hideModal('target');
+      if (closeBtn) closeBtn.style.display = '';
+      socket.emit('respondToAction', { response: 'accept' });
+    };
+  }
 
   showModal('target');
 }
@@ -2139,72 +2171,6 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.remove();
   }, 3000);
-}
-
-// Spin Wheel Animation
-const wheelColors = [
-  '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
-  '#1abc9c', '#e67e22', '#34495e'
-];
-
-function showSpinWheel(players, winningPlayerId, onComplete) {
-  const overlay = document.getElementById('spin-wheel-overlay');
-  const wheel = document.getElementById('spin-wheel');
-  const resultDiv = document.getElementById('spin-wheel-result');
-
-  // Clear previous
-  wheel.innerHTML = '';
-  resultDiv.textContent = '';
-  wheel.style.transform = 'rotate(0deg)';
-
-  // Create segments
-  const segmentAngle = 360 / players.length;
-  players.forEach((player, index) => {
-    const segment = document.createElement('div');
-    segment.className = 'spin-wheel-segment';
-    segment.style.background = wheelColors[index % wheelColors.length];
-
-    // Calculate rotation for this segment
-    // Each segment starts at -90deg (top) and rotates by its index * segmentAngle
-    const rotation = -90 - segmentAngle / 2 + index * segmentAngle;
-    segment.style.transform = `rotate(${rotation}deg) skewY(${90 - segmentAngle}deg)`;
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = player.name;
-    nameSpan.style.transform = `skewY(${-(90 - segmentAngle)}deg) rotate(${segmentAngle / 2}deg)`;
-    segment.appendChild(nameSpan);
-
-    wheel.appendChild(segment);
-  });
-
-  // Show overlay
-  overlay.classList.remove('hidden');
-
-  // Calculate winning rotation
-  const winningIndex = players.findIndex(p => p.id === winningPlayerId);
-  // The pointer is at the top (0 degrees), we need to rotate so the winning segment is at the top
-  // Add extra rotations for effect (5-8 full spins)
-  const extraSpins = 5 + Math.random() * 3;
-  const winningAngle = winningIndex * segmentAngle;
-  // We need to rotate the wheel so that the winning segment ends up at the top (under the pointer)
-  const finalRotation = extraSpins * 360 + (360 - winningAngle);
-
-  // Start spinning after a brief delay
-  setTimeout(() => {
-    wheel.style.transform = `rotate(${finalRotation}deg)`;
-  }, 500);
-
-  // Show result and hide after spin completes
-  setTimeout(() => {
-    const winner = players.find(p => p.id === winningPlayerId);
-    resultDiv.textContent = `${winner.name} goes first!`;
-  }, 4500);
-
-  // Hide overlay and continue
-  setTimeout(() => {
-    overlay.classList.add('hidden');
-    if (onComplete) onComplete();
-  }, 6000);
 }
 
 // Just Say No notification popup

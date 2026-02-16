@@ -2,6 +2,8 @@
 
 A web-based, real-time multiplayer card game inspired by Monopoly Deal. Play with 2-5 friends directly in your browser!
 
+**Play now:** [https://monopoly-deal-production.up.railway.app/](https://monopoly-deal-production.up.railway.app/)
+
 ## Quick Start
 
 1. **Install dependencies:**
@@ -55,7 +57,7 @@ Be the first player to collect **3 complete property sets** of different colors!
 - **Pass Go:** Draw 2 extra cards
 - **Birthday:** Everyone pays you $2M
 - **Debt Collector:** One player pays you $5M
-- **Double the Rent:** Play with a rent card to double the amount owed
+- **Double the Rent:** When playing a rent card, you'll be prompted to double the amount if you have this card in hand
 - **House/Hotel:** Add to complete sets to increase rent value
 
 ### Just Say No Chains
@@ -71,9 +73,10 @@ Note: Playing Just Say No does NOT count as one of your 3 card plays per turn.
 
 ### Core Gameplay
 - Real-time multiplayer (2-5 players)
-- Complete Monopoly Deal card set with all action cards
+- Complete Monopoly Deal card set (108 cards) with official values
 - Turn-based gameplay with 3 cards per turn limit
 - Automatic turn progression and card drawing
+- Play again after a game ends with the same players
 
 ### Property System
 - 10 property colors with different set requirements
@@ -83,8 +86,9 @@ Note: Playing Just Say No does NOT count as one of your 3 card plays per turn.
 
 ### Action Cards
 - Full Just Say No chain support with counter mechanics
-- Sly Deal and Forced Deal property stealing
+- Sly Deal and Forced Deal with informational popups for the target player
 - Deal Breaker for complete set theft
+- Double the Rent prompts automatically when playing rent cards
 - Various rent cards (single color, multi-color, wild)
 - Birthday and Debt Collector money actions
 
@@ -96,6 +100,7 @@ Note: Playing Just Say No does NOT count as one of your 3 card plays per turn.
 
 ### User Interface
 - Shareable game codes and direct invite links
+- In-game chat with draggable chat panel
 - Visual notifications for Just Say No plays
 - Stacked property display for opponents
 - House/Hotel badges on property sets
@@ -107,25 +112,34 @@ Note: Playing Just Say No does NOT count as one of your 3 card plays per turn.
 - **Frontend:** Vanilla HTML/CSS/JavaScript
 - **Backend:** Node.js + Express
 - **Real-time:** Socket.io
+- **Testing:** Jest
 - **Styling:** Custom CSS with animations
 
 ## Project Structure
 ```
 ├── server/
-│   ├── index.js        # Express server + Socket.io
-│   └── gameManager.js  # Game logic and card system
+│   ├── index.js             # Express server + Socket.io
+│   ├── gameManager.js       # Game logic and card system
+│   └── gameManager.test.js  # Tests for game logic
 ├── public/
-│   ├── index.html      # Main HTML file
+│   ├── index.html           # Main HTML file
 │   ├── css/
-│   │   └── styles.css  # All styles + animations
+│   │   └── styles.css       # All styles + animations
 │   └── js/
-│       └── game.js     # Client-side game logic
+│       └── game.js          # Client-side game logic
 └── package.json
+```
+
+## Development
+
+Run the test suite:
+```bash
+npm test
 ```
 
 ## Deployment
 
-The game can be deployed to any Node.js hosting platform. The server automatically uses the `PORT` environment variable:
+The game is deployed on [Railway](https://railway.app). The server automatically uses the `PORT` environment variable:
 
 ```bash
 PORT=8080 npm start
@@ -133,17 +147,17 @@ PORT=8080 npm start
 
 ## Property Sets Reference
 
-| Color | Cards Needed | Rent Values |
-|-------|--------------|-------------|
-| Brown | 2 | $1M, $2M |
-| Light Blue | 3 | $1M, $2M, $3M |
-| Pink | 3 | $1M, $2M, $4M |
-| Orange | 3 | $1M, $3M, $5M |
-| Red | 3 | $2M, $3M, $6M |
-| Yellow | 3 | $2M, $4M, $6M |
-| Green | 3 | $2M, $4M, $7M |
-| Dark Blue | 2 | $3M, $8M |
-| Railroad | 4 | $1M, $2M, $3M, $4M |
-| Utility | 2 | $1M, $2M |
+| Color | Cards Needed | Property Value | Rent Values |
+|-------|--------------|----------------|-------------|
+| Brown | 2 | $1M | $1M, $2M |
+| Light Blue | 3 | $1M | $1M, $2M, $3M |
+| Pink | 3 | $2M | $1M, $2M, $4M |
+| Orange | 3 | $2M | $1M, $3M, $5M |
+| Red | 3 | $3M | $2M, $3M, $6M |
+| Yellow | 3 | $3M | $2M, $4M, $6M |
+| Green | 3 | $4M | $2M, $4M, $7M |
+| Dark Blue | 2 | $4M | $3M, $8M |
+| Railroad | 4 | $2M | $1M, $2M, $3M, $4M |
+| Utility | 2 | $2M | $1M, $2M |
 
-Enjoy the game!
+Houses add +$3M rent, Hotels add +$4M rent on top of that.

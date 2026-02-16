@@ -1030,7 +1030,8 @@ function handleActionCard(card, index) {
       break;
 
     case 'doubleRent':
-      showDoubleRentSelection(index);
+      showToast('Play a Rent card to use Double the Rent', 'error');
+      selectedCard = null;
       break;
 
     default:
@@ -1052,146 +1053,65 @@ function handleRentCard(card, index) {
     return;
   }
 
-  showColorSelection(availableColors, (color) => {
-    if (card.colors === 'ALL') {
-      // Wild rent - need to select target player
-      showPlayerSelection('Select a player to charge rent', (playerId) => {
-        socket.emit('playCard', { cardIndex: index, action: color, target: { playerId } });
+  // Check if player has a Double the Rent card and enough actions remaining
+  const doubleRentIndex = myPlayer.hand.findIndex((c, i) => c.action === 'doubleRent' && i !== index);
+  const hasDoubleRent = doubleRentIndex !== -1 && gameState.actionsRemaining >= 2;
+
+  function playRent(useDoubleRent) {
+    showColorSelection(availableColors, (color) => {
+      const target = useDoubleRent ? { doubleRent: true, doubleRentIndex } : {};
+      if (card.colors === 'ALL') {
+        showPlayerSelection('Select a player to charge rent', (playerId) => {
+          target.playerId = playerId;
+          socket.emit('playCard', { cardIndex: index, action: color, target });
+          selectedCard = null;
+        });
+      } else {
+        socket.emit('playCard', { cardIndex: index, action: color, target });
         selectedCard = null;
-      });
-    } else {
-      socket.emit('playCard', { cardIndex: index, action: color });
-      selectedCard = null;
-    }
-  });
+      }
+    });
+  }
+
+  if (hasDoubleRent) {
+    showDoubleRentPrompt(() => playRent(true), () => playRent(false));
+  } else {
+    playRent(false);
+  }
 }
 
-// Double Rent card selection - show available rent cards to play with
-function showDoubleRentSelection(doubleRentIndex) {
-  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
-
-  // Find all rent cards in hand
-  const rentCards = myPlayer.hand
-    .map((card, index) => ({ card, index }))
-    .filter(({ card, index }) => card.type === 'rent' && index !== doubleRentIndex);
-
-  if (rentCards.length === 0) {
-    showToast('You need a Rent card to play with Double the Rent', 'error');
-    selectedCard = null;
-    return;
-  }
-
-  // Check if we have enough actions (double rent + rent = 2 actions)
-  if (gameState.actionsRemaining < 2) {
-    showToast('You need at least 2 actions to play Double the Rent', 'error');
-    selectedCard = null;
-    return;
-  }
-
-  document.getElementById('target-title').textContent = 'Select a Rent Card to Double';
+// Double Rent prompt - asks player if they want to use their Double the Rent card
+function showDoubleRentPrompt(onYes, onNo) {
+  document.getElementById('target-title').textContent = 'Double the Rent?';
   const container = document.getElementById('target-options');
-  container.innerHTML = '';
+  container.innerHTML = `
+    <div style="text-align: center; padding: 20px;">
+      <div style="font-size: 48px; margin-bottom: 12px;">2X</div>
+      <p style="color: #f39c12; font-size: 16px; font-weight: bold;">
+        You have a Double the Rent card!
+      </p>
+      <p style="color: #888; font-size: 14px; margin-top: 8px;">
+        This will use an extra action to double your rent.
+      </p>
+    </div>
+  `;
 
-  const colorInfo = gameState.propertyColors;
+  document.getElementById('target-confirm').textContent = 'Double it!';
+  document.getElementById('target-confirm').disabled = false;
+  document.getElementById('target-cancel').textContent = 'No thanks';
+  document.getElementById('target-cancel').style.display = 'block';
 
-  rentCards.forEach(({ card, index }) => {
-    // Check if player has properties for this rent card
-    let hasValidProperties = false;
-    let colorNames = '';
-
-    if (card.colors === 'ALL') {
-      hasValidProperties = Object.keys(myPlayer.properties).some(c =>
-        myPlayer.properties[c] && myPlayer.properties[c].length > 0
-      );
-      colorNames = 'Wild (Any Color)';
-    } else {
-      hasValidProperties = card.colors.some(c =>
-        myPlayer.properties[c] && myPlayer.properties[c].length > 0
-      );
-      colorNames = card.colors.map(c => colorInfo[c]?.name || c).join('/');
-    }
-
-    if (!hasValidProperties) return;
-
-    const div = document.createElement('div');
-    div.className = 'target-option';
-
-    // Create color display
-    let bgStyle = '';
-    if (card.colors === 'ALL') {
-      bgStyle = 'background: linear-gradient(45deg, #e74c3c, #f39c12, #27ae60, #3498db);';
-    } else {
-      const colors = card.colors.map(c => colorInfo[c]?.color || '#333');
-      bgStyle = `background: linear-gradient(135deg, ${colors[0]} 50%, ${colors[1]} 50%);`;
-    }
-
-    div.innerHTML = `
-      <div style="width: 30px; height: 40px; ${bgStyle} border-radius: 4px;"></div>
-      <div>
-        <strong>${card.name}</strong>
-        <div style="font-size: 12px; color: #888;">${colorNames}</div>
-      </div>
-    `;
-    div.addEventListener('click', () => {
-      container.querySelectorAll('.target-option').forEach(o => o.classList.remove('selected'));
-      div.classList.add('selected');
-      selectedTarget = { rentCardIndex: index, rentCard: card };
-      document.getElementById('target-confirm').disabled = false;
-    });
-    container.appendChild(div);
-  });
-
-  if (container.children.length === 0) {
-    container.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">No valid rent cards (you need properties matching the rent card colors)</div>';
-  }
-
-  selectedTarget = null;
-  document.getElementById('target-confirm').disabled = true;
   document.getElementById('target-confirm').onclick = () => {
     hideModal('target');
-    if (selectedTarget) {
-      // Now handle the rent card selection like normal, but with doubleRent flag
-      handleDoubleRentWithCard(doubleRentIndex, selectedTarget.rentCardIndex, selectedTarget.rentCard);
-    }
+    onYes();
+  };
+
+  document.getElementById('target-cancel').onclick = () => {
+    hideModal('target');
+    onNo();
   };
 
   showModal('target');
-}
-
-function handleDoubleRentWithCard(doubleRentIndex, rentCardIndex, rentCard) {
-  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
-
-  // Determine available colors
-  const availableColors = rentCard.colors === 'ALL' ?
-    Object.keys(myPlayer.properties).filter(c => myPlayer.properties[c] && myPlayer.properties[c].length > 0) :
-    rentCard.colors.filter(c => myPlayer.properties[c] && myPlayer.properties[c].length > 0);
-
-  if (availableColors.length === 0) {
-    showToast('You need properties of this color to charge rent', 'error');
-    selectedCard = null;
-    return;
-  }
-
-  showColorSelection(availableColors, (color) => {
-    if (rentCard.colors === 'ALL') {
-      // Wild rent - need to select target player
-      showPlayerSelection('Select a player to charge rent', (playerId) => {
-        socket.emit('playCard', {
-          cardIndex: rentCardIndex,
-          action: color,
-          target: { playerId, doubleRent: true, doubleRentIndex }
-        });
-        selectedCard = null;
-      });
-    } else {
-      socket.emit('playCard', {
-        cardIndex: rentCardIndex,
-        action: color,
-        target: { doubleRent: true, doubleRentIndex }
-      });
-      selectedCard = null;
-    }
-  });
 }
 
 // Selection modals
